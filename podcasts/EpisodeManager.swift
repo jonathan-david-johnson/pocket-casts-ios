@@ -438,6 +438,9 @@ class EpisodeManager: NSObject {
             if let token = ServerSettings.syncingV2Token, episode.uploadStatus != UploadStatus.missing.rawValue {
                 return URL(string: "\(ServerConstants.Urls.api())files/url/\(episode.uuid)?token=\(token)")
             }
+        } else if let url = episode.downloadUrl {
+            // RadioStation and any other BaseEpisode conformers with a direct stream URL
+            return URL(string: url)
         }
 
         return nil

@@ -9,7 +9,7 @@ import SwiftUI
 
 class MainTabBarController: UITabBarController, NavigationProtocol {
 
-    enum Tab: Int { case podcasts, filter, discover, profile, upNext }
+    enum Tab: Int { case podcasts, filter, discover, profile, upNext, streams }
 
     var pcTabs = [Tab]()
 
@@ -83,7 +83,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
         fixTarBarTraitCollectionOnIpadForiOS18()
 
-        pcTabs = [.podcasts, .filter, .discover, .upNext, .profile]
+        pcTabs = [.podcasts, .filter, .discover, .upNext, .streams, .profile]
 
         var vcsInTab = [UIViewController]()
 
@@ -106,7 +106,10 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
         let upNextViewController = UpNextViewController(source: .tabBar, showingInTab: true)
         upNextViewController.tabBarItem = UITabBarItem(title: L10n.upNext, image: UIImage(named: "upnext_tab"), tag: pcTabs.firstIndex(of: .upNext)!)
-        vcsInTab = [podcastsController, filtersViewController, discoverViewController, upNextViewController, profileViewController]
+        let streamsViewController = StreamsHostViewController()
+        streamsViewController.tabBarItem = UITabBarItem(title: "Streams", image: UIImage(systemName: "radio"), tag: pcTabs.firstIndex(of: .streams)!)
+
+        vcsInTab = [podcastsController, filtersViewController, discoverViewController, upNextViewController, streamsViewController, profileViewController]
 
         displayEndOfYearBadgeIfNeeded()
 
