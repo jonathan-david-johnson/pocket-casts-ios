@@ -327,6 +327,11 @@
 		4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B52FAFB7780051B62B /* RadioStation.swift */; };
 		4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */; };
 		4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */; };
+		4D11D3BC2FAFB7780051B62B /* CuratedStation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */; };
+		4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */; };
+		4D11D3C02FAFB7780051B62B /* StationsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BF2FAFB7780051B62B /* StationsViewController.swift */; };
+		4D11D3C22FAFB7780051B62B /* StationDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */; };
+		4D11D3C42FAFB7780051B62B /* curated_stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D11D3C32FAFB7780051B62B /* curated_stations.json */; };
 		81C8677C17743B85BF586B0B /* VoiceBoostN.c in Sources */ = {isa = PBXBuildFile; fileRef = 14DD11DB5830A48ACE6928B2 /* VoiceBoostN.c */; };
 		8B0845932A66C86C00742C2F /* Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 2F90990B2A4F88B00044FC55 /* Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8B087FC929DC976F0027EAE5 /* PodcastImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B087FC829DC976F0027EAE5 /* PodcastImage.swift */; };
@@ -1925,6 +1930,11 @@
 		4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStationRegistry.swift; sourceTree = "<group>"; };
 		4D11D3B52FAFB7780051B62B /* RadioStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStation.swift; sourceTree = "<group>"; };
 		4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamsHostViewController.swift; sourceTree = "<group>"; };
+		4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedStation.swift; sourceTree = "<group>"; };
+		4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStationCell.swift; sourceTree = "<group>"; };
+		4D11D3BF2FAFB7780051B62B /* StationsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationsViewController.swift; sourceTree = "<group>"; };
+		4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationDetailViewController.swift; sourceTree = "<group>"; };
+		4D11D3C32FAFB7780051B62B /* curated_stations.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = curated_stations.json; sourceTree = "<group>"; };
 		871975870906424F8C3C70B0 /* Modules */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Modules; sourceTree = SOURCE_ROOT; };
 		8B087FC829DC976F0027EAE5 /* PodcastImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastImage.swift; sourceTree = "<group>"; };
 		8B10E78528D908A900702C54 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -3600,7 +3610,12 @@
 			children = (
 				4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */,
 				4D11D3B52FAFB7780051B62B /* RadioStation.swift */,
+				4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */,
 				4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */,
+				4D11D3BF2FAFB7780051B62B /* StationsViewController.swift */,
+				4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */,
+				4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */,
+				4D11D3C32FAFB7780051B62B /* curated_stations.json */,
 			);
 			path = podcasts/Radio;
 			sourceTree = "<group>";
@@ -6472,6 +6487,7 @@
 				40D1EF9922DC38E2000B9291 /* CustomStorage.xcassets in Resources */,
 				407B21E82231F6A300B4E492 /* UploadedSettingsViewController.xib in Resources */,
 				8B10E78628D9093E00702C54 /* GoogleService-Info.plist in Resources */,
+				4D11D3C42FAFB7780051B62B /* curated_stations.json in Resources */,
 				BDBCE6D1244E7755004FFE13 /* AppIcon-Radioactive20x20@2x.png in Resources */,
 				4029E3E52293AD410003BEEB /* ChangePasswordViewController.xib in Resources */,
 				BD6B665A245BC24C00CF5245 /* AppIcon-Pocket-Cats83.5x83.5@2x~ipad.png in Resources */,
@@ -7094,6 +7110,10 @@
 				4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */,
 				4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */,
 				4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */,
+				4D11D3BC2FAFB7780051B62B /* CuratedStation.swift in Sources */,
+				4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */,
+				4D11D3C02FAFB7780051B62B /* StationsViewController.swift in Sources */,
+				4D11D3C22FAFB7780051B62B /* StationDetailViewController.swift in Sources */,
 				BD1F977C1FD7894C00F89CCD /* MiniPlayerShadowView.swift in Sources */,
 				FF26A9924A1B5C2D00000002 /* MiniPlayerGlassProgressView.swift in Sources */,
 				FF26A99A4A1B5C2D00000004 /* MiniPlayerScrollingTitleView.swift in Sources */,

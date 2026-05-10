@@ -1,73 +1,96 @@
 import UIKit
-import PocketCastsDataModel
 
-/// M1 stub: minimal Streams tab for proving RadioStation playback works.
-/// Replace with full segmented Stations/Favorites/Browse UI in M2.
 class StreamsHostViewController: UIViewController {
+    private let segmentedControl: UISegmentedControl = {
+        let sc = UISegmentedControl(items: ["Stations", "Favorites", "Browse"])
+        sc.selectedSegmentIndex = 0
+        sc.translatesAutoresizingMaskIntoConstraints = false
+        return sc
+    }()
 
-    private let kcrw = RadioStation(
-        stationId: "kcrw",
-        name: "KCRW",
-        streamUrl: "https://streams.kcrw.com/e24_mp3",
-        donateUrl: "https://join.kcrw.com",
-        city: "Santa Monica, CA"
-    )
+    private let containerView: UIView = {
+        let v = UIView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
 
-    private let kexp = RadioStation(
-        stationId: "kexp",
-        name: "KEXP",
-        streamUrl: "https://kexp.streamguys1.com/kexp160.aac",
-        donateUrl: "https://www.kexp.org/donate",
-        city: "Seattle, WA"
-    )
+    private lazy var stationsNavController: UINavigationController = {
+        UINavigationController(rootViewController: StationsViewController())
+    }()
 
-    private let nprHourly = RadioStation(
-        stationId: "npr_hourly",
-        name: "NPR Hourly News",
-        streamUrl: "http://pd.npr.org/anon.npr-mp3/npr/news/newscast.mp3",
-        donateUrl: "https://www.npr.org/donations/support",
-        city: "Washington, DC"
-    )
+    private lazy var favoritesPlaceholder: UIViewController = {
+        makePlaceholder(message: "Sign in to Pocket Casts to see favorites.")
+    }()
+
+    private lazy var browsePlaceholder: UIViewController = {
+        makePlaceholder(message: "Browse coming soon.")
+    }()
+
+    private var currentChild: UIViewController?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Streams"
         view.backgroundColor = .systemBackground
-        setupButtons()
+        setupLayout()
+        segmentedControl.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
+        showChild(stationsNavController)
     }
 
-    private func setupButtons() {
-        let stack = UIStackView()
-        stack.axis = .vertical
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
-
+    private func setupLayout() {
+        view.addSubview(segmentedControl)
+        view.addSubview(containerView)
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32)
+            segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            segmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            segmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+
+            containerView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
+            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            containerView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-
-        for station in [kcrw, kexp, nprHourly] {
-            let btn = UIButton(type: .system)
-            btn.setTitle("▶ \(station.displayableTitle())", for: .normal)
-            btn.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
-            btn.addAction(UIAction { [weak self] _ in self?.play(station) }, for: .touchUpInside)
-            stack.addArrangedSubview(btn)
-        }
-
-        let stopBtn = UIButton(type: .system)
-        stopBtn.setTitle("■ Stop", for: .normal)
-        stopBtn.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
-        stopBtn.tintColor = .systemRed
-        stopBtn.addAction(UIAction { _ in PlaybackManager.shared.pause() }, for: .touchUpInside)
-        stack.addArrangedSubview(stopBtn)
     }
 
-    private func play(_ station: RadioStation) {
-        RadioStationRegistry.shared.register(station)
-        PlaybackManager.shared.load(episode: station, autoPlay: true, overrideUpNext: false)
+    @objc private func segmentChanged() {
+        switch segmentedControl.selectedSegmentIndex {
+        case 0: showChild(stationsNavController)
+        case 1: showChild(favoritesPlaceholder)
+        case 2: showChild(browsePlaceholder)
+        default: break
+        }
+    }
+
+    private func showChild(_ newChild: UIViewController) {
+        if let old = currentChild {
+            old.willMove(toParent: nil)
+            old.view.removeFromSuperview()
+            old.removeFromParent()
+        }
+        addChild(newChild)
+        newChild.view.frame = containerView.bounds
+        newChild.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        containerView.addSubview(newChild.view)
+        newChild.didMove(toParent: self)
+        currentChild = newChild
+    }
+
+    private func makePlaceholder(message: String) -> UIViewController {
+        let vc = UIViewController()
+        vc.view.backgroundColor = .systemBackground
+        let label = UILabel()
+        label.text = message
+        label.textColor = .secondaryLabel
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        vc.view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: vc.view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: vc.view.centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: vc.view.leadingAnchor, constant: 32),
+            label.trailingAnchor.constraint(equalTo: vc.view.trailingAnchor, constant: -32)
+        ])
+        return vc
     }
 }
