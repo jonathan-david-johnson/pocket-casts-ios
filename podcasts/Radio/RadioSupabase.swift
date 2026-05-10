@@ -36,9 +36,7 @@ enum RadioSupabase {
             supabaseURL: url,
             supabaseKey: anonKey,
             options: SupabaseClientOptions(
-                global: SupabaseClientOptions.Global(
-                    headers: ["x-user-uuid": userId]
-                )
+                global: .init(headers: ["x-user-uuid": userId])
             )
         )
     }
