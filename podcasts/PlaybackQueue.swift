@@ -329,6 +329,13 @@ class PlaybackQueue: NSObject {
 
         guard let playlistEpisode = DataManager.sharedManager.playlistEpisodeAt(index: actualIndex) else { return nil }
 
+        // Check in-memory radio station registry before falling back to UserEpisode stub
+        #if !APPCLIP
+        if let station = RadioStationRegistry.shared.station(for: playlistEpisode.episodeUuid) {
+            return station
+        }
+        #endif
+
         let missingEpisode = UserEpisode()
         missingEpisode.title = playlistEpisode.title
         missingEpisode.uuid = playlistEpisode.episodeUuid

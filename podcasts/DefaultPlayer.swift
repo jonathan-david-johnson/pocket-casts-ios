@@ -312,22 +312,29 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
             return
         }
 
-        if assetTrack == nil, player?.currentItem?.status == .readyToPlay, let tracks = player?.currentItem?.asset.tracks {
-            loadEmbeddedImage()
-
-            for track in tracks {
-                if track.mediaType == AVMediaType.audio {
-                    assetTrack = track
-                    break
-                }
+        if player?.currentItem?.status == .readyToPlay {
+            // Re-trigger playback for streams that set rate before item was ready (e.g. live radio)
+            if shouldKeepPlaying, let rate = player?.rate, rate == 0 {
+                performSetPlaybackRate()
             }
 
-            #if !os(watchOS)
-                createAudioMix()
-                player?.currentItem?.audioMix = audioMix
-            #endif
+            if assetTrack == nil, let tracks = player?.currentItem?.asset.tracks {
+                loadEmbeddedImage()
 
-            isWaitingForInitialPlayback = false
+                for track in tracks {
+                    if track.mediaType == AVMediaType.audio {
+                        assetTrack = track
+                        break
+                    }
+                }
+
+                #if !os(watchOS)
+                    createAudioMix()
+                    player?.currentItem?.audioMix = audioMix
+                #endif
+
+                isWaitingForInitialPlayback = false
+            }
         }
 
         PlaybackManager.shared.playerDidChangeNowPlayingInfo()

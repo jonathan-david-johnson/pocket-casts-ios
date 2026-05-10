@@ -62,12 +62,11 @@ class StreamsHostViewController: UIViewController {
         stopBtn.setTitle("■ Stop", for: .normal)
         stopBtn.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
         stopBtn.tintColor = .systemRed
-        stopBtn.addAction(UIAction { _ in PlaybackManager.shared.pause() }, for: .touchUpInside)
+        stopBtn.addAction(UIAction { _ in PlaybackManager.shared.stopPlayback() }, for: .touchUpInside)
         stack.addArrangedSubview(stopBtn)
     }
 
     private func play(_ station: RadioStation) {
-        RadioStationRegistry.shared.register(station)
         PlaybackManager.shared.load(episode: station, autoPlay: true, overrideUpNext: false)
     }
 }

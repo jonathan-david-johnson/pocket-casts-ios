@@ -324,6 +324,9 @@
 		46FBD8B5276A874F00867746 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 46FBD8B9276A874F00867746 /* Intents.intentdefinition */; };
 		46FBD8B6276A874F00867746 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 46FBD8B9276A874F00867746 /* Intents.intentdefinition */; settings = {ATTRIBUTES = (codegen, ); }; };
 		46FBD8B7276A874F00867746 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 46FBD8B9276A874F00867746 /* Intents.intentdefinition */; settings = {ATTRIBUTES = (codegen, ); }; };
+		4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B52FAFB7780051B62B /* RadioStation.swift */; };
+		4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */; };
+		4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */; };
 		81C8677C17743B85BF586B0B /* VoiceBoostN.c in Sources */ = {isa = PBXBuildFile; fileRef = 14DD11DB5830A48ACE6928B2 /* VoiceBoostN.c */; };
 		8B0845932A66C86C00742C2F /* Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 2F90990B2A4F88B00044FC55 /* Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8B087FC929DC976F0027EAE5 /* PodcastImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B087FC829DC976F0027EAE5 /* PodcastImage.swift */; };
@@ -1499,13 +1502,6 @@
 			remoteGlobalIDString = BD3A210C1E6CFC2400F42241;
 			remoteInfo = NotificationExtension;
 		};
-		BDD301801EFB9356004A9972 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = BDBD53E417019B290048C8C5 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = BDD301631EFB9356004A9972;
-			remoteInfo = "Pocket Casts Watch App";
-		};
 		BDEFBA1F1E6D3C2300B9024B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BDBD53E417019B290048C8C5 /* Project object */;
@@ -1593,7 +1589,6 @@
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				BDD301821EFB9356004A9972 /* Pocket Casts Watch App.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1927,6 +1922,9 @@
 		46FBD8CD276A876900867746 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Intents.strings; sourceTree = "<group>"; };
 		46FBD8CF276A876B00867746 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Intents.strings; sourceTree = "<group>"; };
 		46FBD8D1276A876D00867746 /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Intents.strings; sourceTree = "<group>"; };
+		4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStationRegistry.swift; sourceTree = "<group>"; };
+		4D11D3B52FAFB7780051B62B /* RadioStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStation.swift; sourceTree = "<group>"; };
+		4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamsHostViewController.swift; sourceTree = "<group>"; };
 		871975870906424F8C3C70B0 /* Modules */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Modules; sourceTree = SOURCE_ROOT; };
 		8B087FC829DC976F0027EAE5 /* PodcastImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastImage.swift; sourceTree = "<group>"; };
 		8B10E78528D908A900702C54 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -3597,6 +3595,16 @@
 			name = Episode;
 			sourceTree = "<group>";
 		};
+		4D11D3B72FAFB7780051B62B /* Radio */ = {
+			isa = PBXGroup;
+			children = (
+				4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */,
+				4D11D3B52FAFB7780051B62B /* RadioStation.swift */,
+				4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */,
+			);
+			path = podcasts/Radio;
+			sourceTree = "<group>";
+		};
 		8B68C1CD2942132C00CF25C5 /* Beta */ = {
 			isa = PBXGroup;
 			children = (
@@ -4719,6 +4727,7 @@
 		BDBD53E317019B290048C8C5 = {
 			isa = PBXGroup;
 			children = (
+				4D11D3B72FAFB7780051B62B /* Radio */,
 				FF57373B2B4EB5B100F511C7 /* CHANGELOG.md */,
 				FF57373C2B4EB5B100F511C7 /* README.md */,
 				3F7463D02F55488A004C7FF6 /* config */,
@@ -5877,7 +5886,6 @@
 				462EE0C727025399003D67DC /* PBXTargetDependency */,
 				BD3A21131E6CFC2400F42241 /* PBXTargetDependency */,
 				BDEFBA201E6D3C2300B9024B /* PBXTargetDependency */,
-				BDD301811EFB9356004A9972 /* PBXTargetDependency */,
 				403B5B2421813FFA00821A54 /* PBXTargetDependency */,
 				403B5B2721813FFA00821A54 /* PBXTargetDependency */,
 				4090975A25235DFC00CED68C /* PBXTargetDependency */,
@@ -7083,6 +7091,9 @@
 				BDD40A1A1FA1AF7900A53AE1 /* TintableImageView.swift in Sources */,
 				8BC060082AB1FA0400A4FEC6 /* PlayEpisodeIntent.swift in Sources */,
 				40DD88ED215DB18300277A4E /* PlaylistIconChooserCell.swift in Sources */,
+				4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */,
+				4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */,
+				4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */,
 				BD1F977C1FD7894C00F89CCD /* MiniPlayerShadowView.swift in Sources */,
 				FF26A9924A1B5C2D00000002 /* MiniPlayerGlassProgressView.swift in Sources */,
 				FF26A99A4A1B5C2D00000004 /* MiniPlayerScrollingTitleView.swift in Sources */,
@@ -7881,11 +7892,6 @@
 			isa = PBXTargetDependency;
 			target = BD3A210C1E6CFC2400F42241 /* NotificationExtension */;
 			targetProxy = BD3A21121E6CFC2400F42241 /* PBXContainerItemProxy */;
-		};
-		BDD301811EFB9356004A9972 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = BDD301631EFB9356004A9972 /* Pocket Casts Watch App */;
-			targetProxy = BDD301801EFB9356004A9972 /* PBXContainerItemProxy */;
 		};
 		BDEFBA201E6D3C2300B9024B /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

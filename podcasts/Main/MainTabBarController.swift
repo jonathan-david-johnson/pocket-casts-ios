@@ -998,6 +998,8 @@ private extension MainTabBarController {
             event = .profileTabOpened
         case .upNext:
             event = .upNextTabOpened
+        case .streams:
+            return
         }
 
         Analytics.track(event, properties: ["initial": isInitial])
