@@ -332,6 +332,9 @@
 		4D11D3C02FAFB7780051B62B /* StationsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BF2FAFB7780051B62B /* StationsViewController.swift */; };
 		4D11D3C22FAFB7780051B62B /* StationDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */; };
 		4D11D3C42FAFB7780051B62B /* curated_stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D11D3C32FAFB7780051B62B /* curated_stations.json */; };
+		4D11D3C62FAFB7780051B62B /* RadioSupabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */; };
+		4D11D3C82FAFB7780051B62B /* RadioFavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */; };
+		4D11D3CA2FAFB7780051B62B /* FavoritesViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */; };
 		81C8677C17743B85BF586B0B /* VoiceBoostN.c in Sources */ = {isa = PBXBuildFile; fileRef = 14DD11DB5830A48ACE6928B2 /* VoiceBoostN.c */; };
 		8B0845932A66C86C00742C2F /* Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 2F90990B2A4F88B00044FC55 /* Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8B087FC929DC976F0027EAE5 /* PodcastImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B087FC829DC976F0027EAE5 /* PodcastImage.swift */; };
@@ -1935,6 +1938,9 @@
 		4D11D3BF2FAFB7780051B62B /* StationsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationsViewController.swift; sourceTree = "<group>"; };
 		4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationDetailViewController.swift; sourceTree = "<group>"; };
 		4D11D3C32FAFB7780051B62B /* curated_stations.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = curated_stations.json; sourceTree = "<group>"; };
+		4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioSupabase.swift; sourceTree = "<group>"; };
+		4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioFavoritesManager.swift; sourceTree = "<group>"; };
+		4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesViewController.swift; sourceTree = "<group>"; };
 		871975870906424F8C3C70B0 /* Modules */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Modules; sourceTree = SOURCE_ROOT; };
 		8B087FC829DC976F0027EAE5 /* PodcastImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastImage.swift; sourceTree = "<group>"; };
 		8B10E78528D908A900702C54 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -3615,6 +3621,9 @@
 				4D11D3BF2FAFB7780051B62B /* StationsViewController.swift */,
 				4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */,
 				4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */,
+				4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */,
+				4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */,
+				4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */,
 				4D11D3C32FAFB7780051B62B /* curated_stations.json */,
 			);
 			path = podcasts/Radio;
@@ -7114,6 +7123,9 @@
 				4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */,
 				4D11D3C02FAFB7780051B62B /* StationsViewController.swift in Sources */,
 				4D11D3C22FAFB7780051B62B /* StationDetailViewController.swift in Sources */,
+				4D11D3C62FAFB7780051B62B /* RadioSupabase.swift in Sources */,
+				4D11D3C82FAFB7780051B62B /* RadioFavoritesManager.swift in Sources */,
+				4D11D3CA2FAFB7780051B62B /* FavoritesViewController.swift in Sources */,
 				BD1F977C1FD7894C00F89CCD /* MiniPlayerShadowView.swift in Sources */,
 				FF26A9924A1B5C2D00000002 /* MiniPlayerGlassProgressView.swift in Sources */,
 				FF26A99A4A1B5C2D00000004 /* MiniPlayerScrollingTitleView.swift in Sources */,

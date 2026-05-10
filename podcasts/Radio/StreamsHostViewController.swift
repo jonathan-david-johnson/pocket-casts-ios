@@ -18,8 +18,8 @@ class StreamsHostViewController: UIViewController {
         UINavigationController(rootViewController: StationsViewController())
     }()
 
-    private lazy var favoritesPlaceholder: UIViewController = {
-        makePlaceholder(message: "Sign in to Pocket Casts to see favorites.")
+    private lazy var favoritesNavController: UINavigationController = {
+        UINavigationController(rootViewController: FavoritesViewController())
     }()
 
     private lazy var browsePlaceholder: UIViewController = {
@@ -55,7 +55,7 @@ class StreamsHostViewController: UIViewController {
     @objc private func segmentChanged() {
         switch segmentedControl.selectedSegmentIndex {
         case 0: showChild(stationsNavController)
-        case 1: showChild(favoritesPlaceholder)
+        case 1: showChild(favoritesNavController)
         case 2: showChild(browsePlaceholder)
         default: break
         }

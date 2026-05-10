@@ -96,6 +96,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
     }()
 
     private var pollTimer: Timer?
+    private var isFavorited = false
 
     init(station: RadioStation, curatedStation: CuratedStation? = nil) {
         self.station = station
@@ -129,6 +130,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         addCustomObserver(Constants.Notifications.playbackStarted, selector: #selector(playbackChanged))
         addCustomObserver(Constants.Notifications.playbackPaused, selector: #selector(playbackChanged))
         addCustomObserver(Constants.Notifications.playbackEnded, selector: #selector(playbackChanged))
+        loadFavoriteState()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -211,8 +213,36 @@ class StationDetailViewController: SimpleNotificationsViewController {
         updatePlayButton()
     }
 
+    private func loadFavoriteState() {
+        Task { [weak self] in
+            guard let self else { return }
+            let faved = (try? await RadioFavoritesManager.shared.isFavorite(stationId: station.stationId)) ?? false
+            await MainActor.run { self.setFavoriteUI(faved) }
+        }
+    }
+
+    private func setFavoriteUI(_ favorited: Bool) {
+        isFavorited = favorited
+        var config = favoriteButton.configuration
+        config?.image = UIImage(systemName: favorited ? "heart.fill" : "heart")
+        config?.title = favorited ? "Favorited" : "Favorite"
+        favoriteButton.configuration = config
+    }
+
     private func toggleFavorite() {
-        // M3: wire to RadioFavoritesManager
+        let newState = !isFavorited
+        setFavoriteUI(newState)
+        Task {
+            do {
+                if newState {
+                    try await RadioFavoritesManager.shared.addFavorite(stationId: station.stationId)
+                } else {
+                    try await RadioFavoritesManager.shared.removeFavorite(stationId: station.stationId)
+                }
+            } catch {
+                await MainActor.run { self.setFavoriteUI(!newState) }
+            }
+        }
     }
 
     private func openDonate() {
