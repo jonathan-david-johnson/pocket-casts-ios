@@ -97,6 +97,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     private var pollTimer: Timer?
     private var isFavorited = false
+    private var favoriteLoadTask: Task<Void, Never>?
 
     init(station: RadioStation, curatedStation: CuratedStation? = nil) {
         self.station = station
@@ -214,9 +215,10 @@ class StationDetailViewController: SimpleNotificationsViewController {
     }
 
     private func loadFavoriteState() {
-        Task { [weak self] in
+        favoriteLoadTask = Task { [weak self] in
             guard let self else { return }
             let faved = (try? await RadioFavoritesManager.shared.isFavorite(stationId: station.stationId)) ?? false
+            guard !Task.isCancelled else { return }
             await MainActor.run { self.setFavoriteUI(faved) }
         }
     }
@@ -230,6 +232,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
     }
 
     private func toggleFavorite() {
+        favoriteLoadTask?.cancel()
         let newState = !isFavorited
         setFavoriteUI(newState)
         Task {
