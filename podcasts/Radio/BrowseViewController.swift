@@ -81,7 +81,7 @@ class BrowseViewController: UIViewController {
                 self.stations = results
                 self.isShowingTopStations = false
                 if results.isEmpty {
-                    self.showMessage("No stations found for "\(query)"")
+                    self.showMessage("No stations found for \"\(query)\"")
                 } else {
                     self.tableView.backgroundView = nil
                 }
