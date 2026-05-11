@@ -68,9 +68,14 @@ class StreamsHostViewController: UIViewController {
             old.removeFromParent()
         }
         addChild(newChild)
-        newChild.view.frame = containerView.bounds
-        newChild.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        newChild.view.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(newChild.view)
+        NSLayoutConstraint.activate([
+            newChild.view.topAnchor.constraint(equalTo: containerView.topAnchor),
+            newChild.view.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            newChild.view.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            newChild.view.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        ])
         newChild.didMove(toParent: self)
         currentChild = newChild
     }
