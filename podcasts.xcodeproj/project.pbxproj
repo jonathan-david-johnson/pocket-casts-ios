@@ -335,6 +335,8 @@
 		4D11D3C62FAFB7780051B62B /* RadioSupabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */; };
 		4D11D3C82FAFB7780051B62B /* RadioFavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */; };
 		4D11D3CA2FAFB7780051B62B /* FavoritesViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */; };
+		4D11D3CC2FAFB7780051B62B /* RadioBrowserAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3CB2FAFB7780051B62B /* RadioBrowserAPI.swift */; };
+		4D11D3CE2FAFB7780051B62B /* BrowseViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3CD2FAFB7780051B62B /* BrowseViewController.swift */; };
 		81C8677C17743B85BF586B0B /* VoiceBoostN.c in Sources */ = {isa = PBXBuildFile; fileRef = 14DD11DB5830A48ACE6928B2 /* VoiceBoostN.c */; };
 		8B0845932A66C86C00742C2F /* Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 2F90990B2A4F88B00044FC55 /* Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8B087FC929DC976F0027EAE5 /* PodcastImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B087FC829DC976F0027EAE5 /* PodcastImage.swift */; };
@@ -928,7 +930,6 @@
 		BDCE1D611FBC1C4100100A86 /* UrlHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDCE1D601FBC1C4100100A86 /* UrlHelper.swift */; };
 		BDCF3C8024283B0F005B6933 /* ListeningHistoryViewController+Swipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDCF3C7F24283B0F005B6933 /* ListeningHistoryViewController+Swipe.swift */; };
 		BDCF3C8224283C78005B6933 /* UploadedViewController+Swipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDCF3C8124283C78005B6933 /* UploadedViewController+Swipe.swift */; };
-		BDD301821EFB9356004A9972 /* Pocket Casts Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BDD301641EFB9356004A9972 /* Pocket Casts Watch App.app */; };
 		BDD3018E1EFB9574004A9972 /* WatchConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD3018D1EFB9574004A9972 /* WatchConstants.swift */; };
 		BDD3018F1EFB9574004A9972 /* WatchConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD3018D1EFB9574004A9972 /* WatchConstants.swift */; };
 		BDD40A181FA1ABF500A53AE1 /* PCNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD40A171FA1ABF500A53AE1 /* PCNavigationController.swift */; };
@@ -1941,6 +1942,8 @@
 		4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioSupabase.swift; sourceTree = "<group>"; };
 		4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioFavoritesManager.swift; sourceTree = "<group>"; };
 		4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesViewController.swift; sourceTree = "<group>"; };
+		4D11D3CB2FAFB7780051B62B /* RadioBrowserAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioBrowserAPI.swift; sourceTree = "<group>"; };
+		4D11D3CD2FAFB7780051B62B /* BrowseViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseViewController.swift; sourceTree = "<group>"; };
 		871975870906424F8C3C70B0 /* Modules */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Modules; sourceTree = SOURCE_ROOT; };
 		8B087FC829DC976F0027EAE5 /* PodcastImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastImage.swift; sourceTree = "<group>"; };
 		8B10E78528D908A900702C54 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -3611,7 +3614,7 @@
 			name = Episode;
 			sourceTree = "<group>";
 		};
-		4D11D3B72FAFB7780051B62B /* Radio */ = {
+		4D11D3B72FAFB7780051B62B /* podcasts/Radio */ = {
 			isa = PBXGroup;
 			children = (
 				4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */,
@@ -3624,6 +3627,8 @@
 				4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */,
 				4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */,
 				4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */,
+				4D11D3CB2FAFB7780051B62B /* RadioBrowserAPI.swift */,
+				4D11D3CD2FAFB7780051B62B /* BrowseViewController.swift */,
 				4D11D3C32FAFB7780051B62B /* curated_stations.json */,
 			);
 			path = podcasts/Radio;
@@ -4751,7 +4756,7 @@
 		BDBD53E317019B290048C8C5 = {
 			isa = PBXGroup;
 			children = (
-				4D11D3B72FAFB7780051B62B /* Radio */,
+				4D11D3B72FAFB7780051B62B /* podcasts/Radio */,
 				FF57373B2B4EB5B100F511C7 /* CHANGELOG.md */,
 				FF57373C2B4EB5B100F511C7 /* README.md */,
 				3F7463D02F55488A004C7FF6 /* config */,
@@ -7126,6 +7131,8 @@
 				4D11D3C62FAFB7780051B62B /* RadioSupabase.swift in Sources */,
 				4D11D3C82FAFB7780051B62B /* RadioFavoritesManager.swift in Sources */,
 				4D11D3CA2FAFB7780051B62B /* FavoritesViewController.swift in Sources */,
+				4D11D3CC2FAFB7780051B62B /* RadioBrowserAPI.swift in Sources */,
+				4D11D3CE2FAFB7780051B62B /* BrowseViewController.swift in Sources */,
 				BD1F977C1FD7894C00F89CCD /* MiniPlayerShadowView.swift in Sources */,
 				FF26A9924A1B5C2D00000002 /* MiniPlayerGlassProgressView.swift in Sources */,
 				FF26A99A4A1B5C2D00000004 /* MiniPlayerScrollingTitleView.swift in Sources */,
@@ -8221,6 +8228,8 @@
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "Pocket Casts Development";
+				SUPABASE_ANON_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH;
+				SUPABASE_URL = "http://127.0.0.1:54321";
 				SWIFT_OBJC_BRIDGING_HEADER = "podcasts/podcasts-Bridging-Header.h";
 				WRAPPER_EXTENSION = app;
 			};
@@ -9315,6 +9324,8 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPABASE_ANON_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH;
+				SUPABASE_URL = "http://127.0.0.1:54321";
 				SWIFT_OBJC_BRIDGING_HEADER = "podcasts/podcasts-Bridging-Header.h";
 				WRAPPER_EXTENSION = app;
 			};
@@ -9606,6 +9617,8 @@
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "Pocket Casts Development";
+				SUPABASE_ANON_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH;
+				SUPABASE_URL = "http://127.0.0.1:54321";
 				SWIFT_OBJC_BRIDGING_HEADER = "podcasts/podcasts-Bridging-Header.h";
 				WRAPPER_EXTENSION = app;
 			};
@@ -9630,6 +9643,8 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPABASE_ANON_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH;
+				SUPABASE_URL = "http://127.0.0.1:54321";
 				SWIFT_OBJC_BRIDGING_HEADER = "podcasts/podcasts-Bridging-Header.h";
 				WRAPPER_EXTENSION = app;
 			};

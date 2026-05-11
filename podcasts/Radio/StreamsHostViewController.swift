@@ -22,8 +22,8 @@ class StreamsHostViewController: UIViewController {
         UINavigationController(rootViewController: FavoritesViewController())
     }()
 
-    private lazy var browsePlaceholder: UIViewController = {
-        makePlaceholder(message: "Browse coming soon.")
+    private lazy var browseNavController: UINavigationController = {
+        UINavigationController(rootViewController: BrowseViewController())
     }()
 
     private var currentChild: UIViewController?
@@ -56,7 +56,7 @@ class StreamsHostViewController: UIViewController {
         switch segmentedControl.selectedSegmentIndex {
         case 0: showChild(stationsNavController)
         case 1: showChild(favoritesNavController)
-        case 2: showChild(browsePlaceholder)
+        case 2: showChild(browseNavController)
         default: break
         }
     }

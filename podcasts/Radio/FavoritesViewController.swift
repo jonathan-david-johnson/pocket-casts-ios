@@ -1,9 +1,33 @@
 import UIKit
 import PocketCastsServer
 
+private struct FavoriteRow {
+    let stationId: String
+    var curated: CuratedStation?
+    var browse: RadioBrowserStation?
+
+    var displayName: String { curated?.name ?? browse?.name ?? stationId }
+    var displayCity: String {
+        if let c = curated { return c.city }
+        if let b = browse { return b.state.isEmpty ? b.country : "\(b.state), \(b.country)" }
+        return ""
+    }
+    var faviconUrl: String? {
+        guard let b = browse, !b.favicon.isEmpty else { return nil }
+        return b.favicon
+    }
+    var logoAsset: String? { curated?.logoAsset }
+
+    func toRadioStation() -> RadioStation {
+        if let c = curated { return c.toRadioStation() }
+        if let b = browse { return b.toRadioStation() }
+        return RadioStation(stationId: stationId, name: stationId, streamUrl: "")
+    }
+}
+
 class FavoritesViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
-    private var rows: [(stationId: String, curated: CuratedStation?)] = []
+    private var rows: [FavoriteRow] = []
     private let curatedById: [String: CuratedStation]
     private var loadTask: Task<Void, Never>?
 
@@ -55,13 +79,36 @@ class FavoritesViewController: UIViewController {
             guard let self else { return }
             do {
                 let favorites = try await RadioFavoritesManager.shared.loadFavorites()
-                let resolved = favorites.map { fav in
-                    (stationId: fav.station_id, curated: self.curatedById[fav.station_id])
+                var resolved = favorites.map { fav in
+                    FavoriteRow(stationId: fav.station_id, curated: self.curatedById[fav.station_id])
                 }
+
                 await MainActor.run {
                     self.rows = resolved
                     self.tableView.reloadData()
                     if resolved.isEmpty { self.showEmptyState() }
+                }
+
+                // Fetch radio-browser.info data for non-curated stations
+                let browseIndices = resolved.indices.filter { resolved[$0].curated == nil }
+                await withTaskGroup(of: (Int, RadioBrowserStation?).self) { group in
+                    for i in browseIndices {
+                        let stationId = resolved[i].stationId
+                        group.addTask {
+                            let station = try? await RadioBrowserAPI.station(uuid: stationId)
+                            return (i, station)
+                        }
+                    }
+                    for await (i, station) in group {
+                        resolved[i].browse = station
+                    }
+                }
+
+                if !browseIndices.isEmpty {
+                    await MainActor.run {
+                        self.rows = resolved
+                        self.tableView.reloadData()
+                    }
                 }
             } catch {
                 await MainActor.run { self.showEmptyState() }
@@ -100,10 +147,10 @@ extension FavoritesViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: RadioStationCell.reuseId, for: indexPath) as! RadioStationCell
         let row = rows[indexPath.row]
-        if let curated = row.curated {
-            cell.configure(name: curated.name, city: curated.city, logoAsset: curated.logoAsset)
+        if let asset = row.logoAsset {
+            cell.configure(name: row.displayName, city: row.displayCity, logoAsset: asset)
         } else {
-            cell.configure(name: row.stationId, city: "", logoAsset: nil)
+            cell.configure(name: row.displayName, city: row.displayCity, faviconUrl: row.faviconUrl)
         }
         return cell
     }
@@ -116,9 +163,7 @@ extension FavoritesViewController: UITableViewDataSource {
         rows.remove(at: indexPath.row)
         tableView.deleteRows(at: [indexPath], with: .automatic)
         if rows.isEmpty { showEmptyState() }
-        Task {
-            try? await RadioFavoritesManager.shared.removeFavorite(stationId: stationId)
-        }
+        Task { try? await RadioFavoritesManager.shared.removeFavorite(stationId: stationId) }
     }
 }
 
@@ -126,13 +171,7 @@ extension FavoritesViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let row = rows[indexPath.row]
-        let station: RadioStation
-        if let curated = row.curated {
-            station = curated.toRadioStation()
-        } else {
-            station = RadioStation(stationId: row.stationId, name: row.stationId, streamUrl: "")
-        }
-        let detail = StationDetailViewController(station: station, curatedStation: row.curated)
+        let detail = StationDetailViewController(station: row.toRadioStation(), curatedStation: row.curated)
         navigationController?.pushViewController(detail, animated: true)
     }
 }
