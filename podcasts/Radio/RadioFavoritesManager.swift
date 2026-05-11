@@ -24,18 +24,11 @@ class RadioFavoritesManager {
 
     func addFavorite(stationId: String) async throws {
         guard let userId = ServerSettings.userId else { throw RadioError.notLoggedIn }
-        print("[RadioFavorites] addFavorite userId=\(userId) stationId=\(stationId)")
         let db = try RadioSupabase.client()
-        do {
-            let response = try await db
-                .from("radio_favorites")
-                .upsert(["user_uuid": userId, "station_id": stationId])
-                .execute()
-            print("[RadioFavorites] addFavorite success status=\(response.status) data=\(String(data: response.data, encoding: .utf8) ?? "nil")")
-        } catch {
-            print("[RadioFavorites] addFavorite error: \(error)")
-            throw error
-        }
+        try await db
+            .from("radio_favorites")
+            .upsert(["user_uuid": userId, "station_id": stationId])
+            .execute()
     }
 
     func removeFavorite(stationId: String) async throws {
