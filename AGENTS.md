@@ -1,3 +1,24 @@
+## Project context
+
+This is **PocketRadio**, a personal fork of `Automattic/pocket-casts-ios` maintained by Jonathan David Johnson. The fork adds internet radio streaming (radio-browser.info) and other "spoken / streamed audio" features on top of the upstream podcast app. See `README.md` for the human-facing summary.
+
+Milestone planning documents live at `../docs/current_milestone.md` and `../docs/milestones/milestone_N.md`. Always check `../docs/current_milestone.md` when picking up work — it is the source of truth for the active task.
+
+## Simulator and bundle reference
+
+| Item | Value |
+|------|-------|
+| Default sim — "iPhone 17 Pro - No Watch" UDID | `F0042A02-0973-4694-B267-49A1CC21FE19` |
+| Staging bundle id | `au.com.shiftyjelly.podcasts` (NOT `.staging`) |
+| Staging scheme | `"Pocket Casts Staging"` |
+| Staging configuration | `StagingDebug` |
+| Bundle id root xcconfig | `config/PocketCasts.base.xcconfig` (`PRODUCT_BUNDLE_IDENTIFIER_ROOT`) |
+
+Build/run helpers on the pinned sim:
+- `make build_sim` — build StagingDebug for the sim UDID above
+- `make run_sim` — build, boot Simulator.app, install, and launch the app
+- `SIM_UDID=...` overrides the default sim
+
 ## Formatting
 
 Format all code using the linter formatter:
@@ -28,6 +49,12 @@ make test_staging
 ```bash
 make test_staging ONLY_TESTING=PocketCastsTests/YourTestClass/testMethodName
 ```
+
+### Test file layout
+
+Unit tests live under `PocketCastsTests/Tests/<Feature>/<ClassName>Tests.swift`. The `PocketCastsTests` target uses an Xcode `PBXFileSystemSynchronizedRootGroup`, so **new test files placed under `PocketCastsTests/Tests/` are picked up automatically** — no `project.pbxproj` edit is required. Main-app source files (e.g. anything under `podcasts/`) still need pbxproj registration. Mirror an existing peer (e.g. `StreamsHostViewController.swift`) when adding new app-side files.
+
+Test pattern: `XCTest` + `@testable import podcasts`, instantiate the view controller, call `loadViewIfNeeded()`, assert on resulting state. See `PocketCastsTests/Tests/Discover/CategoryPodcastsViewControllerTests.swift` as a representative example.
 
 ### Running Module Tests
 
@@ -130,6 +157,48 @@ SwiftLint is configured with opt-in rules. Notable custom rules:
 ## Themes
 - When styling Views, use `@EnvironmentObject private var theme: Theme` and inject `.environmentObject(Theme.sharedTheme)` where the View is used.
 - Use `AppTheme.color(for: .primaryText01, theme: theme)` to access themed colors
+
+## In-repo patterns (use before reinventing)
+
+| Need | Established pattern | Reference file |
+|------|---------------------|----------------|
+| Segmented two-button header hosting child VCs ("Foo / Bar" tabs inside a screen) | Container VC with `UISegmentedControl` + `containerView` + `showChild(_:)` swapping `UINavigationController`-wrapped children | `podcasts/Radio/StreamsHostViewController.swift`, `podcasts/PlaylistsHostViewController.swift` |
+| Top-level tabs | `MainTabBarController` `Tab` enum + `pcTabs` array | `podcasts/Main/MainTabBarController.swift` |
+
+When adding a similar UI pattern, mirror the established one rather than introducing a new style.
+
+## Reference sweeps before refactors
+
+When removing or renaming a widely-referenced symbol (an enum case in `Tab`, a public function name, a UserDefaults key, etc.), perform a **reference sweep** before declaring the file list complete:
+
+```bash
+grep -rn "Tab\.upNext\|case upNext\b" podcasts/ Modules/ PocketCastsTests/
+```
+
+Common stragglers when changing `Tab` enum cases specifically:
+- `podcasts/AnalyticsHelper.swift` — `tabSelected(tab:)` switch
+- `podcasts/Analytics/AnalyticsEvent.swift` — enum cases like `upNextTabOpened`
+- `podcasts/Main/MainTabBarController+shortcuts.swift` — keyboard shortcut handlers
+- `podcasts/Main/NavigationManager.swift` — navigation dispatch
+
+List every hit in the plan and address it as part of the same change set. A build that succeeds in one target may still fail in another configuration, so confirm with `make build_staging` after the sweep.
+
+## UserDefaults migrations
+
+When changing the semantics of a stored value (e.g., remapping `lastTabOpened` after a tab is removed), the migration **must be idempotent**:
+
+1. Define a one-shot flag key in `Constants.UserDefaults` named for the migration (e.g., `lastTabOpenedMigratedM5`).
+2. Read the flag at the migration site. If set, skip.
+3. Perform the remap. Write the new value back.
+4. Set the flag.
+
+Include the flag key and gating condition explicitly in the milestone plan — do not leave the choice to the implementing agent.
+
+## SourceKit diagnostic caveat
+
+After adding new Swift files or editing across module boundaries, SourceKit (the IDE language service) may emit transient "No such module 'UIKit'", "No such module 'XCTest'", or "No such module 'PocketCastsDataModel'" errors. These are **stale-index artifacts**, not real build failures.
+
+**Always trust the result of `make build_staging` / `make test_staging` over a SourceKit-only diagnostic.** Re-running the build typically refreshes the index. Do not chase imports based on these warnings alone.
 
 ## Protocol Buffers
 

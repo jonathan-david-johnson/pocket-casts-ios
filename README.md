@@ -1,3 +1,30 @@
+# PocketRadio — a personal fork of Pocket Casts iOS
+
+This repository is a fork of [Automattic/pocket-casts-ios](https://github.com/Automattic/pocket-casts-ios) maintained by Jonathan David Johnson. It is a personal project, not an officially supported build.
+
+## Why this fork exists
+
+I enjoy both internet radio and podcasts, and I'd like to use a single app for both. Pocket Casts is an excellent foundation for the podcast side, so I'm extending it with internet radio streaming (currently powered by [radio-browser.info](https://www.radio-browser.info/)) and related features that fit a "listen to anything spoken or streamed" use case.
+
+Current plan: build this for my own daily use. If it matures into something polished and broadly useful, I may consider making it public in some form. No promises, no roadmap — work happens when it happens.
+
+## Secondary goal: agentic development
+
+This project is also a long-running experiment in **agentic development** — building real software primarily through AI coding agents (Claude Code in particular), with human direction, review, and judgement on top. Expect to see:
+
+- Per-milestone planning documents in `../docs/milestones/`
+- Detailed task plans and review notes checked into the repo
+- Automated test coverage written alongside the features (rather than after)
+- Conventions and gotchas captured in `CLAUDE.md` so agents can pick them up across sessions
+
+If you're reading this as another developer (human or otherwise), the project conventions, build commands, and "how things are organized" details are documented in `CLAUDE.md` alongside this README.
+
+---
+
+## Upstream Pocket Casts README
+
+What follows is the original Pocket Casts iOS README, preserved for reference.
+
 <p align="center">
     <!-- Pocket Casts brand image -->
     <img src="https://user-images.githubusercontent.com/308331/194037473-41ad7eba-8602-4be5-be73-49e3c0c48c12.svg#gh-light-mode-only" />
