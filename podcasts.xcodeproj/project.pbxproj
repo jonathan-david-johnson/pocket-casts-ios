@@ -337,6 +337,7 @@
 		4D11D3CA2FAFB7780051B62B /* FavoritesViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */; };
 		4D11D3CC2FAFB7780051B62B /* RadioBrowserAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3CB2FAFB7780051B62B /* RadioBrowserAPI.swift */; };
 		4D11D3CE2FAFB7780051B62B /* BrowseViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3CD2FAFB7780051B62B /* BrowseViewController.swift */; };
+		4D11D3D12FAFB7780051B62B /* PlaylistsHostViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3D02FAFB7780051B62B /* PlaylistsHostViewController.swift */; };
 		81C8677C17743B85BF586B0B /* VoiceBoostN.c in Sources */ = {isa = PBXBuildFile; fileRef = 14DD11DB5830A48ACE6928B2 /* VoiceBoostN.c */; };
 		8B0845932A66C86C00742C2F /* Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 2F90990B2A4F88B00044FC55 /* Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8B087FC929DC976F0027EAE5 /* PodcastImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B087FC829DC976F0027EAE5 /* PodcastImage.swift */; };
@@ -1944,6 +1945,7 @@
 		4D11D3C92FAFB7780051B62B /* FavoritesViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesViewController.swift; sourceTree = "<group>"; };
 		4D11D3CB2FAFB7780051B62B /* RadioBrowserAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioBrowserAPI.swift; sourceTree = "<group>"; };
 		4D11D3CD2FAFB7780051B62B /* BrowseViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseViewController.swift; sourceTree = "<group>"; };
+		4D11D3D02FAFB7780051B62B /* PlaylistsHostViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistsHostViewController.swift; sourceTree = "<group>"; };
 		871975870906424F8C3C70B0 /* Modules */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Modules; sourceTree = SOURCE_ROOT; };
 		8B087FC829DC976F0027EAE5 /* PodcastImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastImage.swift; sourceTree = "<group>"; };
 		8B10E78528D908A900702C54 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -4459,6 +4461,7 @@
 		BD618BD91702BE9D00967A6B /* Playlists */ = {
 			isa = PBXGroup;
 			children = (
+				4D11D3D02FAFB7780051B62B /* PlaylistsHostViewController.swift */,
 				3F585D302F568D28005A3593 /* PlaylistMetadataLoader */,
 				BD4FC1DC1FA6EB310013364F /* Edit */,
 				BD93FDB02015A25C00F6EF55 /* Single */,
@@ -7063,6 +7066,7 @@
 				BD2A49E61701A6AE00C2F192 /* SJCommonUtils.m in Sources */,
 				406D9F8E253F9BF400B654C6 /* FilterPreviewViewController.swift in Sources */,
 				BDA681AD220D185A0053BEEE /* BaseEpisode+Formatting.swift in Sources */,
+				4D11D3D12FAFB7780051B62B /* PlaylistsHostViewController.swift in Sources */,
 				BD93FDA620159A9A00F6EF55 /* PlaylistsViewController.swift in Sources */,
 				BDB5F0C52045036200437669 /* OptionAction.swift in Sources */,
 				40FFAD93214A170200024FCF /* FilterSettingsOverlayController.swift in Sources */,

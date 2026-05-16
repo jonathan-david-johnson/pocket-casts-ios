@@ -9,7 +9,7 @@ import SwiftUI
 
 class MainTabBarController: UITabBarController, NavigationProtocol {
 
-    enum Tab: Int { case podcasts, filter, discover, profile, upNext, streams }
+    enum Tab: Int { case podcasts, filter, discover, profile, streams }
 
     var pcTabs = [Tab]()
 
@@ -83,14 +83,14 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
         fixTarBarTraitCollectionOnIpadForiOS18()
 
-        pcTabs = [.podcasts, .filter, .discover, .upNext, .streams, .profile]
+        pcTabs = [.podcasts, .filter, .discover, .streams, .profile]
 
         var vcsInTab = [UIViewController]()
 
         let podcastsController = PodcastListViewController()
         podcastsController.tabBarItem = UITabBarItem(title: L10n.podcastsPlural, image: UIImage(named: "podcasts_tab"), tag: pcTabs.firstIndex(of: .podcasts)!)
 
-        let filtersViewController = PlaylistsViewController()
+        let filtersViewController = PlaylistsHostViewController()
         if FeatureFlag.playlistsRebranding.enabled {
             filtersViewController.tabBarItem = UITabBarItem(title: L10n.playlists, image: UIImage(named: "playlists_tab"), tag: pcTabs.firstIndex(of: .filter)!)
         } else {
@@ -104,20 +104,47 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         let profileViewController = ProfileViewController()
         profileViewController.tabBarItem = profileTabBarItem
 
-        let upNextViewController = UpNextViewController(source: .tabBar, showingInTab: true)
-        upNextViewController.tabBarItem = UITabBarItem(title: L10n.upNext, image: UIImage(named: "upnext_tab"), tag: pcTabs.firstIndex(of: .upNext)!)
         let streamsViewController = StreamsHostViewController()
         streamsViewController.tabBarItem = UITabBarItem(title: "Streams", image: UIImage(systemName: "radio"), tag: pcTabs.firstIndex(of: .streams)!)
 
-        vcsInTab = [podcastsController, filtersViewController, discoverViewController, upNextViewController, streamsViewController, profileViewController]
+        vcsInTab = [podcastsController, filtersViewController, discoverViewController, streamsViewController, profileViewController]
 
         displayEndOfYearBadgeIfNeeded()
 
         viewControllers = vcsInTab.map { SJUIUtils.navController(for: $0) }
-        selectedIndex = UserDefaults.standard.integer(forKey: Constants.UserDefaults.lastTabOpened)
+
+        // M5 migration: old layout had .upNext at raw index 3 and .streams/.profile at 4/5.
+        // New layout: [.podcasts(0), .filter(1), .discover(2), .streams(3), .profile(4)].
+        // Remap stored index if migration has not yet run.
+        if !UserDefaults.standard.bool(forKey: Constants.UserDefaults.lastTabOpenedMigratedM5),
+           UserDefaults.standard.object(forKey: Constants.UserDefaults.lastTabOpened) != nil {
+            let stored = UserDefaults.standard.integer(forKey: Constants.UserDefaults.lastTabOpened)
+            let remapped: Int
+            switch stored {
+            case 3: // old .upNext → filter
+                remapped = pcTabs.firstIndex(of: .filter) ?? stored
+            case 4: // old .streams → new .streams
+                remapped = pcTabs.firstIndex(of: .streams) ?? stored
+            case 5: // old .profile → new .profile
+                remapped = pcTabs.firstIndex(of: .profile) ?? stored
+            default:
+                remapped = min(stored, pcTabs.count - 1)
+            }
+            UserDefaults.standard.set(remapped, forKey: Constants.UserDefaults.lastTabOpened)
+            UserDefaults.standard.set(true, forKey: Constants.UserDefaults.lastTabOpenedMigratedM5)
+        }
+
+        let rawTabIndex = UserDefaults.standard.integer(forKey: Constants.UserDefaults.lastTabOpened)
+        let clampedTabIndex = max(0, min(rawTabIndex, pcTabs.count - 1))
+        if clampedTabIndex != rawTabIndex {
+            UserDefaults.standard.set(clampedTabIndex, forKey: Constants.UserDefaults.lastTabOpened)
+        }
+        selectedIndex = clampedTabIndex
 
         // Track the initial tab opened event
-        trackTabOpened(pcTabs[selectedIndex], isInitial: true)
+        if let tab = pcTabs[safe: selectedIndex] {
+            trackTabOpened(tab, isInitial: true)
+        }
 
         NavigationManager.sharedManager.mainViewControllerDidLoad(controller: self)
         setupMiniPlayer()
@@ -436,7 +463,13 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     }
 
     func navigateToUpNext(_ animated: Bool) {
-        switchToTab(.upNext)
+        switchToTab(.filter)
+        if let index = pcTabs.firstIndex(of: .filter),
+           let navController = viewControllers?[safe: index] as? UINavigationController,
+           let host = navController.viewControllers.first as? PlaylistsHostViewController {
+            navController.popToRootViewController(animated: false)
+            host.selectUpNext()
+        }
     }
 
     func navigateToProfile(row: ProfileViewController.TableRow? = nil, animated: Bool) {
@@ -455,13 +488,16 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     func navigateToFilter(_ filter: EpisodeFilter?, animated: Bool) {
         guard switchToTab(.filter) else { return }
 
-        guard let navController = selectedViewController as? UINavigationController else {
+        guard let index = pcTabs.firstIndex(of: .filter),
+              let navController = viewControllers?[safe: index] as? UINavigationController,
+              let host = navController.viewControllers.first as? PlaylistsHostViewController else {
             return
         }
         navController.popToRootViewController(animated: false)
+        host.selectPlaylist()
 
         guard let filter,
-              let filtersViewController = navController.topViewController as? PlaylistsViewController else {
+              let filtersViewController = host.playlistsViewController else {
             return
         }
         filtersViewController.showFilter(filter)
@@ -996,8 +1032,6 @@ private extension MainTabBarController {
             event = .discoverTabOpened
         case .profile:
             event = .profileTabOpened
-        case .upNext:
-            event = .upNextTabOpened
         case .streams:
             return
         }
