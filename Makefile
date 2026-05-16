@@ -9,7 +9,10 @@ SIMULATOR_NAME = $(shell xcrun simctl list devices available \
 	| grep "iPhone" \
 	| tail -1 | sed 's/^[[:space:]]*//' | sed 's/ *(.*) *$$//')
 
-.PHONY: help build clean test lint lint_lenient format install_dependencies
+SIM_UDID = F0042A02-0973-4694-B267-49A1CC21FE19
+SIM_BUNDLE_ID = au.com.shiftyjelly.podcasts
+
+.PHONY: help build clean test lint lint_lenient format install_dependencies build_sim run_sim launch_sim
 
 define run_in_buildtools
 	@pushd BuildTools && \
@@ -72,6 +75,28 @@ test_staging: ## Build and run Unit Tests using the StagingDebug configuration
 	    -scheme "Pocket Casts Staging" \
         -only-testing:$(ONLY_TESTING) \
         -destination 'platform=iOS Simulator,name=$(SIMULATOR_NAME),OS=latest'
+
+build_sim: ## Build StagingDebug for iPhone 17 Pro - No Watch simulator
+	xcodebuild -project podcasts.xcodeproj \
+	   -scheme "Pocket Casts Staging" \
+	   -configuration StagingDebug \
+	   -destination 'platform=iOS Simulator,id=$(SIM_UDID)' \
+	   build
+
+launch_sim: ## Boot the target simulator if not already booted
+	@xcrun simctl bootstatus $(SIM_UDID) -b >/dev/null 2>&1 || xcrun simctl boot $(SIM_UDID)
+	@open -a Simulator --args -CurrentDeviceUDID $(SIM_UDID)
+
+run_sim: build_sim launch_sim ## Build, install, and launch app on iPhone 17 Pro - No Watch
+	@APP_PATH=$$(xcodebuild -project podcasts.xcodeproj \
+	   -scheme "Pocket Casts Staging" \
+	   -configuration StagingDebug \
+	   -destination 'platform=iOS Simulator,id=$(SIM_UDID)' \
+	   -showBuildSettings 2>/dev/null \
+	   | awk -F' = ' '/ BUILT_PRODUCTS_DIR / {d=$$2} / WRAPPER_NAME / {w=$$2} END {print d "/" w}'); \
+	echo "Installing $$APP_PATH"; \
+	xcrun simctl install $(SIM_UDID) "$$APP_PATH"; \
+	xcrun simctl launch $(SIM_UDID) $(SIM_BUNDLE_ID)
 
 format: ## Lint and autocorrect linter errors
 	$(call run_in_buildtools,$(SWIFTLINT_FROM_BUILDTOOLS) --autocorrect)
