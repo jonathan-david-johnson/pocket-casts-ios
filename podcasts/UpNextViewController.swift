@@ -411,31 +411,32 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
     }
 
     func updateNavBarButtons() {
+        guard view.window != nil else { return }
         navigationController?.navigationBar.tintColor = AppTheme.navBarIconsColor(themeOverride: themeOverride)
         if isMultiSelectEnabled {
             if MultiSelectHelper.shouldSelectAll(onCount: selectedPlayListEpisodes.count, totalCount: PlaybackManager.shared.queue.upNextCount()) {
-                navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.selectAll, style: .plain, target: self, action: #selector(selectAllTapped))
+                effectiveNavigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.selectAll, style: .plain, target: self, action: #selector(selectAllTapped))
             } else {
-                navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.deselectAll, style: .plain, target: self, action: #selector(deselectAllTapped))
+                effectiveNavigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.deselectAll, style: .plain, target: self, action: #selector(deselectAllTapped))
             }
-            navigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.cancel, style: .plain, target: self, action: #selector(cancelTapped))
+            effectiveNavigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.cancel, style: .plain, target: self, action: #selector(cancelTapped))
         } else if !isMultiSelectEnabled, PlaybackManager.shared.queue.upNextCount() > 0 {
-            navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.select, style: .plain, target: self, action: #selector(selectTapped))
+            effectiveNavigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.select, style: .plain, target: self, action: #selector(selectTapped))
             if showingInTab {
                 if FeatureFlag.upNextShuffle.enabled, PlaybackManager.shared.queue.upNextCount() > 0 {
-                    navigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.clear, style: .plain, target: self, action: #selector(clearQueueTapped))
+                    effectiveNavigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.clear, style: .plain, target: self, action: #selector(clearQueueTapped))
                 } else {
-                    navigationItem.leftBarButtonItem = nil
+                    effectiveNavigationItem.leftBarButtonItem = nil
                 }
             } else {
-                navigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.done, style: .plain, target: self, action: #selector(doneTapped))
+                effectiveNavigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.done, style: .plain, target: self, action: #selector(doneTapped))
             }
         } else {
-            navigationItem.rightBarButtonItem = nil
+            effectiveNavigationItem.rightBarButtonItem = nil
             if showingInTab {
-                navigationItem.leftBarButtonItem = nil
+                effectiveNavigationItem.leftBarButtonItem = nil
             } else {
-                navigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.done, style: .plain, target: self, action: #selector(doneTapped))
+                effectiveNavigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.done, style: .plain, target: self, action: #selector(doneTapped))
             }
         }
     }

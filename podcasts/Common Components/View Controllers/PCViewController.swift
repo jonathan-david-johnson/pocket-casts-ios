@@ -108,10 +108,10 @@ class PCViewController: SimpleNotificationsViewController {
                 buttons.append(googleCastBtn)
             }
             buttons.append(contentsOf: extraRightButtons)
-            navigationItem.rightBarButtonItems = buttons
+            effectiveNavigationItem.rightBarButtonItems = buttons
         } else {
-            navigationItem.rightBarButtonItems = nil
-            navigationItem.rightBarButtonItem = customRightBtn
+            effectiveNavigationItem.rightBarButtonItems = nil
+            effectiveNavigationItem.rightBarButtonItem = customRightBtn
         }
     }
 

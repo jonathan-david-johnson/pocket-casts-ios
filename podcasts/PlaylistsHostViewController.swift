@@ -1,89 +1,83 @@
 import UIKit
 
 class PlaylistsHostViewController: UIViewController {
-    private let segmentedControl: UISegmentedControl = {
-        let sc = UISegmentedControl(items: [L10n.playlists, L10n.upNext])
-        sc.selectedSegmentIndex = 0
-        sc.translatesAutoresizingMaskIntoConstraints = false
-        return sc
-    }()
-
-    private let containerView: UIView = {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-
-    private lazy var playlistsNav: UINavigationController = {
-        UINavigationController(rootViewController: PlaylistsViewController())
-    }()
-
-    private lazy var upNextNav: UINavigationController = {
-        UINavigationController(rootViewController: UpNextViewController(source: .tabBar, showingInTab: true))
-    }()
-
+    private var titleView: SegmentedTitleView?
     private var currentChild: UIViewController?
+
+    private lazy var _playlistsViewController: PlaylistsViewController = PlaylistsViewController()
+    private lazy var upNextViewController: UpNextViewController = UpNextViewController(source: .tabBar, showingInTab: true)
+
+    /// Optional for API compatibility with callers that guard-let this property.
+    var playlistsViewController: PlaylistsViewController? { _playlistsViewController }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        setupLayout()
-        segmentedControl.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
-        showChild(playlistsNav)
-    }
 
-    private func setupLayout() {
-        view.addSubview(segmentedControl)
-        view.addSubview(containerView)
-        NSLayoutConstraint.activate([
-            segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            segmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            segmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            containerView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
-            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            containerView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-    }
-
-    @objc private func segmentChanged() {
-        switch segmentedControl.selectedSegmentIndex {
-        case 0: showChild(playlistsNav)
-        case 1: showChild(upNextNav)
-        default: break
+        let tv = SegmentedTitleView()
+        tv.onSelect = { [weak self] segment in
+            switch segment {
+            case .playlists: self?.selectPlaylist()
+            case .upNext:    self?.selectUpNext()
+            }
         }
+        navigationItem.titleView = tv
+        titleView = tv
+
+        showChild(_playlistsViewController)
     }
+
+    // MARK: - Public API
 
     func selectPlaylist() {
-        segmentedControl.selectedSegmentIndex = 0
-        showChild(playlistsNav)
+        titleView?.setActive(.playlists)
+        showChild(_playlistsViewController)
     }
 
     func selectUpNext() {
-        segmentedControl.selectedSegmentIndex = 1
-        showChild(upNextNav)
+        titleView?.setActive(.upNext)
+        showChild(upNextViewController)
     }
 
-    var playlistsViewController: PlaylistsViewController? {
-        playlistsNav.viewControllers.first as? PlaylistsViewController
-    }
+    // MARK: - Child management
 
     private func showChild(_ newChild: UIViewController) {
+        guard newChild !== currentChild else { return }
+
+        // Remove old child
         if let old = currentChild {
             old.willMove(toParent: nil)
             old.view.removeFromSuperview()
             old.removeFromParent()
         }
+
+        // Clear stale bar buttons before child's viewDidLoad writes fresh ones
+        navigationItem.leftBarButtonItem = nil
+        navigationItem.rightBarButtonItem = nil
+
+        // addChild before accessing view so parent is set when viewDidLoad fires
         addChild(newChild)
+        newChild.loadViewIfNeeded()
+
         newChild.view.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(newChild.view)
+        view.addSubview(newChild.view)
         NSLayoutConstraint.activate([
-            newChild.view.topAnchor.constraint(equalTo: containerView.topAnchor),
-            newChild.view.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            newChild.view.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            newChild.view.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            newChild.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            newChild.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            newChild.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            newChild.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+
         newChild.didMove(toParent: self)
         currentChild = newChild
+
+        // Re-emit bar buttons for children whose viewDidLoad has already fired
+        // (loadViewIfNeeded is a no-op on second and later swaps).
+        if let pc = newChild as? PCViewController {
+            pc.refreshRightButtons()
+        }
+        if let upNext = newChild as? UpNextViewController {
+            upNext.updateNavBarButtons()
+        }
     }
 }

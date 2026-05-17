@@ -39,7 +39,7 @@ final class MainTabBarControllerTests: XCTestCase {
 
         XCTAssertEqual(controller.selectedIndex, filterIndex)
         XCTAssertGreaterThan(host?.children.count ?? 0, 0, "host should have child view controllers after loadViewIfNeeded")
-        XCTAssertNotNil(host?.children.compactMap { ($0 as? UINavigationController)?.viewControllers.first as? UpNextViewController }.first,
+        XCTAssertNotNil(host?.children.first as? UpNextViewController,
                         "navigateToUpNext should leave UpNextViewController visible inside host")
     }
 
