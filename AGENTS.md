@@ -4,6 +4,8 @@ This is **PocketRadio**, a personal fork of `Automattic/pocket-casts-ios` mainta
 
 Milestone planning documents live at `../docs/current_milestone.md` and `../docs/milestones/milestone_N.md`. Always check `../docs/current_milestone.md` when picking up work — it is the source of truth for the active task.
 
+**Symlink convention:** `../docs/current_milestone.md` is always a symlink to the active milestone file (e.g. `milestones/milestone_5.1.md`). To start a new milestone, create `milestones/milestone_N.M.md` and repoint the symlink — do NOT write the new plan through `current_milestone.md`, that overwrites the previous milestone's archive. Use `/new-milestone <N>` to do this safely. Same trap exists in this repo: `CLAUDE.md` is a symlink to `AGENTS.md`; edits to `CLAUDE.md` land in `AGENTS.md`, and `git add CLAUDE.md` is a no-op.
+
 ## Simulator and bundle reference
 
 | Item | Value |
@@ -156,13 +158,15 @@ SwiftLint is configured with opt-in rules. Notable custom rules:
 
 ## Themes
 - When styling Views, use `@EnvironmentObject private var theme: Theme` and inject `.environmentObject(Theme.sharedTheme)` where the View is used.
-- Use `AppTheme.color(for: .primaryText01, theme: theme)` to access themed colors
+- **SwiftUI:** `AppTheme.color(for: .primaryText01, theme: theme)` → returns SwiftUI `Color`.
+- **UIKit:** `AppTheme.colorForStyle(.primaryText01, themeOverride: ...)` → returns `UIColor`. Do NOT call the SwiftUI signature from UIKit code; the types won't bridge.
 
 ## In-repo patterns (use before reinventing)
 
 | Need | Established pattern | Reference file |
 |------|---------------------|----------------|
-| Segmented two-button header hosting child VCs ("Foo / Bar" tabs inside a screen) | Container VC with `UISegmentedControl` + `containerView` + `showChild(_:)` swapping `UINavigationController`-wrapped children | `podcasts/Radio/StreamsHostViewController.swift`, `podcasts/PlaylistsHostViewController.swift` |
+| Segmented container row above content (3+ segments, each child keeps own nav controller) | `UISegmentedControl` + `containerView` + `showChild(_:)` swapping `UINavigationController`-wrapped children | `podcasts/Radio/StreamsHostViewController.swift` |
+| Two-segment header in the nav bar itself (single nav bar, no extra row) | `SegmentedTitleView` as `navigationItem.titleView`; children added directly (no inner nav controller); children's bar buttons routed via `effectiveNavigationItem` extension | `podcasts/PlaylistsHostViewController.swift`, `podcasts/SegmentedTitleView.swift`, `podcasts/Common Components/View Controllers/UIViewController+EffectiveNavigationItem.swift` |
 | Top-level tabs | `MainTabBarController` `Tab` enum + `pcTabs` array | `podcasts/Main/MainTabBarController.swift` |
 
 When adding a similar UI pattern, mirror the established one rather than introducing a new style.
