@@ -17,8 +17,9 @@ class PlaylistsHostViewController: UIViewController {
         let tv = SegmentedTitleView()
         tv.onSelect = { [weak self] segment in
             switch segment {
-            case .playlists: self?.selectPlaylist()
-            case .upNext:    self?.selectUpNext()
+            case .playlists:          self?.selectPlaylist()
+            case .upNext:             self?.selectUpNext()
+            case .favorites, .browse: break
             }
         }
         navigationItem.titleView = tv

@@ -9,6 +9,7 @@ struct RadioBrowserStation: Codable {
     let state: String
     let tags: String
     let votes: Int
+    let bitrate: Int?
 
     func toRadioStation() -> RadioStation {
         let city = state.isEmpty ? country : "\(state), \(country)"
@@ -17,8 +18,8 @@ struct RadioBrowserStation: Codable {
             name: name,
             streamUrl: url_resolved,
             donateUrl: nil,
-            tracklistUrl: nil,
-            city: city
+            city: city,
+            bitrate: bitrate
         )
     }
 }

@@ -5,33 +5,36 @@
       "name": "KCRW",
       "description": "Music and NPR news from Santa Monica",
       "streamUrl": "https://streams.kcrw.com/e24_mp3",
-      "tracklistUrl": "https://tracklist-api.kcrw.com/Music/all/1?page_size=10",
       "donateUrl": "https://join.kcrw.com",
       "homepageUrl": "https://www.kcrw.com",
       "logoAsset": "kcrw_logo",
-      "city": "Santa Monica, CA"
+      "city": "Santa Monica, CA",
+      "bitrate": 192,
+      "seedAsFavorite": true
     },
     {
       "id": "kexp",
       "name": "KEXP",
       "description": "Where the music matters",
       "streamUrl": "https://kexp.streamguys1.com/kexp160.aac",
-      "tracklistUrl": "https://api.kexp.org/v2/plays/?limit=10",
       "donateUrl": "https://www.kexp.org/donate",
       "homepageUrl": "https://www.kexp.org",
       "logoAsset": "kexp_logo",
-      "city": "Seattle, WA"
+      "city": "Seattle, WA",
+      "bitrate": 160,
+      "seedAsFavorite": true
     },
     {
       "id": "npr_hourly",
       "name": "NPR Hourly News",
       "description": "Live news updates every hour",
       "streamUrl": "http://pd.npr.org/anon.npr-mp3/npr/news/newscast.mp3",
-      "tracklistUrl": null,
       "donateUrl": "https://www.npr.org/donations/support",
       "homepageUrl": "https://www.npr.org",
       "logoAsset": "npr_logo",
-      "city": "Washington, DC"
+      "city": "Washington, DC",
+      "bitrate": null,
+      "seedAsFavorite": true
     }
   ]
 }

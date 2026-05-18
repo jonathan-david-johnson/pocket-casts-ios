@@ -31,6 +31,15 @@ class StationDetailViewController: SimpleNotificationsViewController {
         return l
     }()
 
+    private let bitrateLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 13)
+        l.textColor = .secondaryLabel
+        l.textAlignment = .center
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
     private lazy var playButton: UIButton = {
         var config = UIButton.Configuration.filled()
         config.title = "Play"
@@ -85,6 +94,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         let l = UILabel()
         l.font = .systemFont(ofSize: 16, weight: .medium)
         l.numberOfLines = 2
+        l.text = ""
         return l
     }()
 
@@ -92,10 +102,10 @@ class StationDetailViewController: SimpleNotificationsViewController {
         let l = UILabel()
         l.font = .systemFont(ofSize: 14)
         l.textColor = .secondaryLabel
+        l.text = ""
         return l
     }()
 
-    private var pollTimer: Timer?
     private var isFavorited = false
     private var favoriteLoadTask: Task<Void, Never>?
 
@@ -123,30 +133,35 @@ class StationDetailViewController: SimpleNotificationsViewController {
         nameLabel.text = station.displayableTitle()
         cityLabel.text = station.city
 
-        if station.tracklistUrl != nil {
-            setupNowPlayingSection()
-            pollTracklist()
+        if let bitrate = station.bitrate {
+            bitrateLabel.text = "\(bitrate) kbps"
+            bitrateLabel.isHidden = false
+        } else {
+            bitrateLabel.isHidden = true
         }
+
+        setupNowPlayingSection()
 
         addCustomObserver(Constants.Notifications.playbackStarted, selector: #selector(playbackChanged))
         addCustomObserver(Constants.Notifications.playbackPaused, selector: #selector(playbackChanged))
         addCustomObserver(Constants.Notifications.playbackEnded, selector: #selector(playbackChanged))
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleNowPlayingChange(_:)),
+            name: .radioStationNowPlayingDidChange,
+            object: nil
+        )
+
         loadFavoriteState()
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        if station.tracklistUrl != nil {
-            pollTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-                self?.pollTracklist()
-            }
-        }
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        pollTimer?.invalidate()
-        pollTimer = nil
         removeAllCustomObservers()
     }
 
@@ -157,11 +172,11 @@ class StationDetailViewController: SimpleNotificationsViewController {
         buttonStack.distribution = .fillEqually
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, cityLabel, buttonStack, donateButton])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, cityLabel, bitrateLabel, buttonStack, donateButton])
         mainStack.axis = .vertical
         mainStack.spacing = 12
         mainStack.alignment = .center
-        mainStack.setCustomSpacing(20, after: cityLabel)
+        mainStack.setCustomSpacing(20, after: bitrateLabel)
         mainStack.setCustomSpacing(8, after: buttonStack)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
 
@@ -192,6 +207,19 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     @objc private func playbackChanged() {
         updatePlayButton()
+    }
+
+    @objc private func handleNowPlayingChange(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard let info = notification.userInfo,
+                  let stationId = info[RadioMetadataNotificationKey.stationId] as? String,
+                  stationId == station.uuid else { return }
+            let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
+            let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
+            trackTitleLabel.text = title
+            trackArtistLabel.text = artist
+        }
     }
 
     private func updatePlayButton() {
@@ -251,51 +279,5 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private func openDonate() {
         guard let urlString = station.donateUrl, let url = URL(string: urlString) else { return }
         UIApplication.shared.open(url)
-    }
-
-    private func pollTracklist() {
-        guard let urlString = station.tracklistUrl, let url = URL(string: urlString) else { return }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard let self, let data else { return }
-            DispatchQueue.main.async { self.parseTracklist(data: data, stationId: self.station.stationId) }
-        }.resume()
-    }
-
-    private func parseTracklist(data: Data, stationId: String) {
-        switch stationId {
-        case "kcrw":
-            parseKCRW(data: data)
-        case "kexp":
-            parseKEXP(data: data)
-        default:
-            break
-        }
-    }
-
-    private func parseKCRW(data: Data) {
-        struct KCRWResponse: Decodable {
-            struct Track: Decodable { let title: String; let artist: String }
-            let results: [Track]
-        }
-        guard let response = try? JSONDecoder().decode(KCRWResponse.self, from: data),
-              let track = response.results.first else { return }
-        trackTitleLabel.text = track.title
-        trackArtistLabel.text = track.artist
-    }
-
-    private func parseKEXP(data: Data) {
-        struct KEXPResponse: Decodable {
-            struct Play: Decodable {
-                let play_type: String
-                let song: String?
-                let artist: String?
-            }
-            let results: [Play]
-        }
-        guard let response = try? JSONDecoder().decode(KEXPResponse.self, from: data) else { return }
-        if let track = response.results.first(where: { $0.play_type == "trackplay" }) {
-            trackTitleLabel.text = track.song ?? ""
-            trackArtistLabel.text = track.artist ?? ""
-        }
     }
 }

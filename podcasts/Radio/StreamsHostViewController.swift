@@ -1,101 +1,98 @@
 import UIKit
 
+/// Root view controller for the Streams tab.
+///
+/// Mirrors the M5.1 PlaylistsHostViewController pattern:
+/// - Installs a SegmentedTitleView (Favorites / Browse) as navigationItem.titleView.
+/// - Hosts FavoritesViewController and BrowseViewController as plain child VCs
+///   added directly to its own view (no inner UINavigationController per child).
+/// - Routes children's bar buttons via effectiveNavigationItem (already in repo from
+///   M5.1). Both child VCs are plain UIViewController subclasses that do not write
+///   navigationItem.{left,right}BarButtonItem directly, so no bar-button routing is
+///   needed for this milestone. If either child is later promoted to PCViewController,
+///   refreshRightButtons() can be added to showChild(_:) exactly as in the playlists host.
+///
+/// Limitation: FavoritesViewController and BrowseViewController are plain UIViewController
+/// subclasses (not PCViewController), so their navigationItem writes do not flow through
+/// effectiveNavigationItem automatically. Neither child currently sets bar buttons, so
+/// this is a no-op limitation for M6. See milestone "Risks / Edge cases" for the note.
 class StreamsHostViewController: UIViewController {
-    private let segmentedControl: UISegmentedControl = {
-        let sc = UISegmentedControl(items: ["Stations", "Favorites", "Browse"])
-        sc.selectedSegmentIndex = 0
-        sc.translatesAutoresizingMaskIntoConstraints = false
-        return sc
-    }()
-
-    private let containerView: UIView = {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-
-    private lazy var stationsNavController: UINavigationController = {
-        UINavigationController(rootViewController: StationsViewController())
-    }()
-
-    private lazy var favoritesNavController: UINavigationController = {
-        UINavigationController(rootViewController: FavoritesViewController())
-    }()
-
-    private lazy var browseNavController: UINavigationController = {
-        UINavigationController(rootViewController: BrowseViewController())
-    }()
-
+    private var titleView: SegmentedTitleView?
     private var currentChild: UIViewController?
+
+    private lazy var _favoritesViewController: FavoritesViewController = FavoritesViewController()
+    private lazy var _browseViewController: BrowseViewController = BrowseViewController()
+
+    /// Optional for API compatibility with callers that guard-let this property.
+    var favoritesViewController: FavoritesViewController? { _favoritesViewController }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Streams"
         view.backgroundColor = .systemBackground
-        setupLayout()
-        segmentedControl.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
-        showChild(stationsNavController)
-    }
 
-    private func setupLayout() {
-        view.addSubview(segmentedControl)
-        view.addSubview(containerView)
-        NSLayoutConstraint.activate([
-            segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            segmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            segmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-
-            containerView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
-            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            containerView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-    }
-
-    @objc private func segmentChanged() {
-        switch segmentedControl.selectedSegmentIndex {
-        case 0: showChild(stationsNavController)
-        case 1: showChild(favoritesNavController)
-        case 2: showChild(browseNavController)
-        default: break
+        let tv = SegmentedTitleView(leading: .favorites, trailing: .browse)
+        tv.onSelect = { [weak self] segment in
+            switch segment {
+            case .favorites:          self?.selectFavorites()
+            case .browse:             self?.selectBrowse()
+            case .playlists, .upNext: break
+            }
         }
+        navigationItem.titleView = tv
+        titleView = tv
+
+        showChild(_favoritesViewController)
     }
+
+    // MARK: - Public API
+
+    func selectFavorites() {
+        titleView?.setActive(.favorites)
+        showChild(_favoritesViewController)
+    }
+
+    func selectBrowse() {
+        titleView?.setActive(.browse)
+        showChild(_browseViewController)
+    }
+
+    // MARK: - Child management
 
     private func showChild(_ newChild: UIViewController) {
+        guard newChild !== currentChild else { return }
+
+        // Remove old child
         if let old = currentChild {
             old.willMove(toParent: nil)
             old.view.removeFromSuperview()
             old.removeFromParent()
         }
+
+        // Clear stale bar buttons before child's viewDidLoad writes fresh ones
+        navigationItem.leftBarButtonItem = nil
+        navigationItem.rightBarButtonItem = nil
+
+        // addChild before accessing view so parent is set when viewDidLoad fires
         addChild(newChild)
+        newChild.loadViewIfNeeded()
+
         newChild.view.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(newChild.view)
+        view.addSubview(newChild.view)
         NSLayoutConstraint.activate([
-            newChild.view.topAnchor.constraint(equalTo: containerView.topAnchor),
-            newChild.view.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            newChild.view.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            newChild.view.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            newChild.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            newChild.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            newChild.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            newChild.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+
         newChild.didMove(toParent: self)
         currentChild = newChild
-    }
 
-    private func makePlaceholder(message: String) -> UIViewController {
-        let vc = UIViewController()
-        vc.view.backgroundColor = .systemBackground
-        let label = UILabel()
-        label.text = message
-        label.textColor = .secondaryLabel
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        vc.view.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: vc.view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: vc.view.centerYAnchor),
-            label.leadingAnchor.constraint(equalTo: vc.view.leadingAnchor, constant: 32),
-            label.trailingAnchor.constraint(equalTo: vc.view.trailingAnchor, constant: -32)
-        ])
-        return vc
+        // Re-emit bar buttons for children that are PCViewController subclasses.
+        // FavoritesViewController and BrowseViewController are plain UIViewController
+        // subclasses in M6, so this block is currently a no-op.
+        if let pc = newChild as? PCViewController {
+            pc.refreshRightButtons()
+        }
     }
 }

@@ -14,22 +14,22 @@ import PocketCastsDataModel
     public let stationId: String
     public let streamUrl: String
     public let donateUrl: String?
-    public let tracklistUrl: String?
     public let city: String?
+    public let bitrate: Int?
 
     public init(
         stationId: String,
         name: String,
         streamUrl: String,
         donateUrl: String? = nil,
-        tracklistUrl: String? = nil,
-        city: String? = nil
+        city: String? = nil,
+        bitrate: Int? = nil
     ) {
         self.stationId = stationId
         self.streamUrl = streamUrl
         self.donateUrl = donateUrl
-        self.tracklistUrl = tracklistUrl
         self.city = city
+        self.bitrate = bitrate
 
         self.uuid = stationId
         self.title = name

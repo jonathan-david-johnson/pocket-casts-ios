@@ -35,6 +35,10 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
     private var playFailedObserver: NSObjectProtocol?
     private var playStalledObserver: NSObjectProtocol?
 
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
+    private var radioMetadataObserver: RadioMetadataObserver?
+    #endif
+
     private var episodeUuid: String?
     private var podcastUuid: String?
 
@@ -76,6 +80,9 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         }
 
         guard let playerItem = DownloadManager.shared.downloadParallelToStream(of: episode) else {
+            #if !os(watchOS) && !APPCLIP && !os(tvOS)
+            radioMetadataObserver = nil
+            #endif
             handlePlaybackError("Unable to create playback item")
             return
         }
@@ -83,6 +90,16 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         isWaitingForInitialPlayback = true
 
         player = AVPlayer(playerItem: playerItem)
+
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        if let radio = episode as? RadioStation {
+            let observer = RadioMetadataObserver(stationId: radio.uuid)
+            observer.attach(to: playerItem)
+            radioMetadataObserver = observer
+        } else {
+            radioMetadataObserver = nil
+        }
+        #endif
 
         episodeUuid = episode.uuid
         podcastUuid = episode.parentIdentifier()
@@ -220,6 +237,9 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         audioMix = nil
         assetTrack = nil
         player = nil
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        radioMetadataObserver = nil
+        #endif
     }
 
     func effectsDidChange() {

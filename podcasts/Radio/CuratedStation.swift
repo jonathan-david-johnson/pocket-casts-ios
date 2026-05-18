@@ -5,11 +5,12 @@ struct CuratedStation: Codable {
     let name: String
     let description: String
     let streamUrl: String
-    let tracklistUrl: String?
     let donateUrl: String
     let homepageUrl: String
     let logoAsset: String
     let city: String
+    let bitrate: Int?
+    let seedAsFavorite: Bool?
 
     func toRadioStation() -> RadioStation {
         RadioStation(
@@ -17,8 +18,8 @@ struct CuratedStation: Codable {
             name: name,
             streamUrl: streamUrl,
             donateUrl: donateUrl,
-            tracklistUrl: tracklistUrl,
-            city: city
+            city: city,
+            bitrate: bitrate
         )
     }
 }

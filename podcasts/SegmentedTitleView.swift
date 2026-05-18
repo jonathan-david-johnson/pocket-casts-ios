@@ -1,21 +1,43 @@
 import UIKit
 
 class SegmentedTitleView: UIView {
-    enum Segment: CaseIterable { case playlists, upNext }
+    enum Segment: CaseIterable {
+        case playlists, upNext, favorites, browse
+
+        var title: String {
+            switch self {
+            case .playlists: return L10n.playlists
+            case .upNext:    return L10n.upNext
+            case .favorites: return "Favorites"
+            case .browse:    return "Browse"
+            }
+        }
+    }
 
     var onSelect: ((Segment) -> Void)?
 
-    private(set) var activeSegment: Segment = .playlists {
+    private(set) var activeSegment: Segment {
         didSet { refreshStyles() }
     }
 
-    private let playlistsButton = SegmentButton()
-    private let upNextButton = SegmentButton()
+    private let leadingButton = SegmentButton()
+    private let trailingButton = SegmentButton()
     private let separatorLabel = UILabel()
     private let stack = UIStackView()
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    private let leadingSegment: Segment
+    private let trailingSegment: Segment
+
+    /// Default initializer — shows Playlists / Up Next (M5.1 behaviour).
+    convenience override init(frame: CGRect) {
+        self.init(leading: .playlists, trailing: .upNext)
+    }
+
+    init(leading: Segment, trailing: Segment) {
+        self.leadingSegment = leading
+        self.trailingSegment = trailing
+        self.activeSegment = leading
+        super.init(frame: .zero)
         setup()
         NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
     }
@@ -31,24 +53,24 @@ class SegmentedTitleView: UIView {
     func simulateTap(on segment: Segment) { handleTap(segment) }
 
     private func setup() {
-        playlistsButton.setTitle(L10n.playlists, for: .normal)
-        upNextButton.setTitle(L10n.upNext, for: .normal)
+        leadingButton.setTitle(leadingSegment.title, for: .normal)
+        trailingButton.setTitle(trailingSegment.title, for: .normal)
         separatorLabel.text = "/"
         separatorLabel.isUserInteractionEnabled = false
 
-        for (button, segment) in [(playlistsButton, Segment.playlists), (upNextButton, Segment.upNext)] {
+        for (button, segment) in [(leadingButton, leadingSegment), (trailingButton, trailingSegment)] {
             button.addAction(UIAction { [weak self] _ in self?.handleTap(segment) }, for: .touchUpInside)
             button.isAccessibilityElement = true
             button.accessibilityTraits = .button
         }
-        playlistsButton.accessibilityLabel = L10n.playlists
-        upNextButton.accessibilityLabel = L10n.upNext
+        leadingButton.accessibilityLabel = leadingSegment.title
+        trailingButton.accessibilityLabel = trailingSegment.title
 
         stack.axis = .horizontal
         stack.spacing = 6
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
-        [playlistsButton, separatorLabel, upNextButton].forEach { stack.addArrangedSubview($0) }
+        [leadingButton, separatorLabel, trailingButton].forEach { stack.addArrangedSubview($0) }
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor),
@@ -74,8 +96,8 @@ class SegmentedTitleView: UIView {
         let activeFont = metrics.scaledFont(for: .systemFont(ofSize: 17, weight: .semibold))
         let inactiveFont = metrics.scaledFont(for: .systemFont(ofSize: 17, weight: .regular))
 
-        configure(playlistsButton, isActive: activeSegment == .playlists, primary: primary, secondary: secondary, activeFont: activeFont, inactiveFont: inactiveFont)
-        configure(upNextButton, isActive: activeSegment == .upNext, primary: primary, secondary: secondary, activeFont: activeFont, inactiveFont: inactiveFont)
+        configure(leadingButton, isActive: activeSegment == leadingSegment, primary: primary, secondary: secondary, activeFont: activeFont, inactiveFont: inactiveFont)
+        configure(trailingButton, isActive: activeSegment == trailingSegment, primary: primary, secondary: secondary, activeFont: activeFont, inactiveFont: inactiveFont)
 
         separatorLabel.font = inactiveFont
         separatorLabel.textColor = secondary

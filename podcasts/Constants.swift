@@ -133,6 +133,7 @@ struct Constants {
         static let lastFilterShown = "SJLastFilter"
         static let lastTabOpened = "SJLastTabOpened"
         static let lastTabOpenedMigratedM5 = "SJLastTabOpenedMigratedM5"
+        static let radioFavoritesSeeded = "RadioFavoritesSeededM6"
         static let lastImageRefreshTime = "SJLastImageRefreshDate"
         static let promotionFinishedAcknowledged = "SJPromotionFinishedAcknowledged"
 
