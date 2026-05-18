@@ -54,8 +54,9 @@ final class RadioMetadataObserver: NSObject, AVPlayerItemMetadataOutputPushDeleg
         // - Just the title text (HLS in-band ID3).
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Reject ad frames.
+        // Reject ad frames by explicit markers.
         if trimmed.contains("adw_ad='true'") { return nil }
+        if trimmed.range(of: #"insertionType='(preroll|midroll|postroll|ad)'"#, options: .regularExpression) != nil { return nil }
 
         // Extract StreamTitle content if framed.
         let streamTitle: String
@@ -72,6 +73,13 @@ final class RadioMetadataObserver: NSObject, AVPlayerItemMetadataOutputPushDeleg
 
         let title = streamTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return nil }
+
+        // Reject titles that are themselves ad/junk markers (e.g. station automation emits
+        // `StreamTitle='preroll';` with no adw_ad flag, or `[BREAK]` / `-[BREAK]-` between songs).
+        let lower = title.lowercased()
+        if lower.contains("[break]") { return nil }
+        let junkTitles: Set<String> = ["preroll", "midroll", "postroll", "advertisement", "ad", "break"]
+        if junkTitles.contains(lower) { return nil }
 
         // Split on first " - " (with surrounding spaces) for artist/title.
         if let dash = title.range(of: " - ") {

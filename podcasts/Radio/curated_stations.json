@@ -4,12 +4,13 @@
       "id": "kcrw",
       "name": "KCRW",
       "description": "Music and NPR news from Santa Monica",
-      "streamUrl": "https://streams.kcrw.com/e24_mp3",
+      "streamUrl": "https://streams.kcrw.com/e24_aac",
       "donateUrl": "https://join.kcrw.com",
       "homepageUrl": "https://www.kcrw.com",
       "logoAsset": "kcrw_logo",
       "city": "Santa Monica, CA",
-      "bitrate": 192,
+      "bitrate": 256,
+      "tracklistUrl": "https://tracklist-api.kcrw.com/Music/all/1?page_size=10",
       "seedAsFavorite": true
     },
     {
@@ -22,6 +23,7 @@
       "logoAsset": "kexp_logo",
       "city": "Seattle, WA",
       "bitrate": 160,
+      "tracklistUrl": "https://api.kexp.org/v2/plays/?limit=10",
       "seedAsFavorite": true
     },
     {

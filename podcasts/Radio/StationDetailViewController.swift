@@ -22,21 +22,33 @@ class StationDetailViewController: SimpleNotificationsViewController {
         return l
     }()
 
-    private let cityLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 15)
-        l.textColor = .secondaryLabel
-        l.textAlignment = .center
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
     private let bitrateLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 13)
         l.textColor = .secondaryLabel
         l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let nowPlayingTitleLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 17, weight: .semibold)
+        l.textAlignment = .center
+        l.numberOfLines = 2
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.isHidden = true
+        return l
+    }()
+
+    private let nowPlayingArtistLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 15)
+        l.textColor = .secondaryLabel
+        l.textAlignment = .center
+        l.numberOfLines = 1
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.isHidden = true
         return l
     }()
 
@@ -74,37 +86,23 @@ class StationDetailViewController: SimpleNotificationsViewController {
         return btn
     }()
 
-    private let nowPlayingSection: UIStackView = {
-        let sv = UIStackView()
-        sv.axis = .vertical
-        sv.spacing = 4
-        sv.translatesAutoresizingMaskIntoConstraints = false
-        return sv
+    // MARK: - Tracklist
+
+    private let tracklistTable: UITableView = {
+        let tv = UITableView(frame: .zero, style: .plain)
+        tv.separatorStyle = .singleLine
+        tv.estimatedRowHeight = 76
+        tv.rowHeight = UITableView.automaticDimension
+        tv.translatesAutoresizingMaskIntoConstraints = false
+        return tv
     }()
 
-    private let nowPlayingHeader: UILabel = {
-        let l = UILabel()
-        l.text = "NOW PLAYING"
-        l.font = .systemFont(ofSize: 11, weight: .semibold)
-        l.textColor = .secondaryLabel
-        return l
-    }()
+    private var entries: [TracklistEntry] = []
+    private var icyTitle: String = ""
+    private var icyArtist: String = ""
+    private var pendingTracklistTask: Task<Void, Never>?
 
-    private let trackTitleLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 16, weight: .medium)
-        l.numberOfLines = 2
-        l.text = ""
-        return l
-    }()
-
-    private let trackArtistLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 14)
-        l.textColor = .secondaryLabel
-        l.text = ""
-        return l
-    }()
+    private var hasAnyICY: Bool { !icyTitle.isEmpty }
 
     private var isFavorited = false
     private var favoriteLoadTask: Task<Void, Never>?
@@ -124,14 +122,17 @@ class StationDetailViewController: SimpleNotificationsViewController {
         setupLayout()
         updatePlayButton()
 
-        if let asset = curatedStation?.logoAsset, let image = UIImage(named: asset) {
+        // Try the curated station passed in; if absent (e.g. opened from Favorites
+        // where the caller didn't propagate it), look it up by id.
+        let resolvedCurated = curatedStation
+            ?? CuratedStationsLoader.load().first { $0.id == station.stationId }
+        if let asset = resolvedCurated?.logoAsset, let image = UIImage(named: asset) {
             logoView.image = image
         } else {
             logoView.image = UIImage(systemName: "radio")
             logoView.tintColor = .secondaryLabel
         }
         nameLabel.text = station.displayableTitle()
-        cityLabel.text = station.city
 
         if let bitrate = station.bitrate {
             bitrateLabel.text = "\(bitrate) kbps"
@@ -140,7 +141,15 @@ class StationDetailViewController: SimpleNotificationsViewController {
             bitrateLabel.isHidden = true
         }
 
-        setupNowPlayingSection()
+        tracklistTable.register(TracklistCell.self, forCellReuseIdentifier: TracklistCell.reuseIdentifier)
+        tracklistTable.dataSource = self
+        tracklistTable.delegate = self
+        tracklistTable.isHidden = (station.tracklistUrl == nil)
+
+        if let cached = RadioTracklistService.shared.cached(stationId: station.uuid) {
+            self.entries = Array(cached.prefix(5))
+            self.tracklistTable.reloadData()
+        }
 
         addCustomObserver(Constants.Notifications.playbackStarted, selector: #selector(playbackChanged))
         addCustomObserver(Constants.Notifications.playbackPaused, selector: #selector(playbackChanged))
@@ -156,7 +165,24 @@ class StationDetailViewController: SimpleNotificationsViewController {
         loadFavoriteState()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if station.tracklistUrl != nil {
+            Task { await refetchTracklist() }
+        }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        pendingTracklistTask?.cancel()
+        pendingTracklistTask = nil
+    }
+
     deinit {
+        MainActor.assumeIsolated {
+            pendingTracklistTask?.cancel()
+            pendingTracklistTask = nil
+        }
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -172,16 +198,20 @@ class StationDetailViewController: SimpleNotificationsViewController {
         buttonStack.distribution = .fillEqually
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, cityLabel, bitrateLabel, buttonStack, donateButton])
+        // Layout: logo → name → ICY title → ICY artist → bitrate → buttons → donate
+        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, nowPlayingTitleLabel, nowPlayingArtistLabel, bitrateLabel, buttonStack, donateButton])
         mainStack.axis = .vertical
         mainStack.spacing = 12
         mainStack.alignment = .center
+        mainStack.setCustomSpacing(4, after: nameLabel)
+        mainStack.setCustomSpacing(2, after: nowPlayingTitleLabel)
+        mainStack.setCustomSpacing(12, after: nowPlayingArtistLabel)
         mainStack.setCustomSpacing(20, after: bitrateLabel)
         mainStack.setCustomSpacing(8, after: buttonStack)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(mainStack)
-        view.addSubview(nowPlayingSection)
+        view.addSubview(tracklistTable)
 
         NSLayoutConstraint.activate([
             logoView.widthAnchor.constraint(equalToConstant: 120),
@@ -193,16 +223,11 @@ class StationDetailViewController: SimpleNotificationsViewController {
             mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
 
-            nowPlayingSection.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: 32),
-            nowPlayingSection.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            nowPlayingSection.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24)
+            tracklistTable.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: 16),
+            tracklistTable.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            tracklistTable.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            tracklistTable.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
-    }
-
-    private func setupNowPlayingSection() {
-        nowPlayingSection.addArrangedSubview(nowPlayingHeader)
-        nowPlayingSection.addArrangedSubview(trackTitleLabel)
-        nowPlayingSection.addArrangedSubview(trackArtistLabel)
     }
 
     @objc private func playbackChanged() {
@@ -217,8 +242,39 @@ class StationDetailViewController: SimpleNotificationsViewController {
                   stationId == station.uuid else { return }
             let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
             let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
-            trackTitleLabel.text = title
-            trackArtistLabel.text = artist
+            self.icyTitle = title
+            self.icyArtist = artist
+            self.updateNowPlayingLabels()
+
+            // Debounced tracklist refetch: cancel previous pending task, start a new one
+            // that waits 2 seconds before fetching (coalesces rapid ICY frame bursts).
+            self.pendingTracklistTask?.cancel()
+            self.pendingTracklistTask = Task { [weak self] in
+                do { try await Task.sleep(nanoseconds: 2_000_000_000) } catch { return }
+                guard !Task.isCancelled, let self else { return }
+                await self.refetchTracklist()
+            }
+        }
+    }
+
+    private func updateNowPlayingLabels() {
+        let hasTitle = !icyTitle.isEmpty
+        let hasArtist = !icyArtist.isEmpty
+        nowPlayingTitleLabel.text = icyTitle
+        nowPlayingTitleLabel.isHidden = !hasTitle
+        nowPlayingArtistLabel.text = icyArtist
+        nowPlayingArtistLabel.isHidden = !hasArtist
+    }
+
+    @MainActor
+    private func refetchTracklist() async {
+        guard let url = station.tracklistUrl, !url.isEmpty else { return }
+        do {
+            let fresh = try await RadioTracklistService.shared.fetch(stationId: station.uuid, url: url)
+            self.entries = Array(fresh.prefix(5))
+            self.tracklistTable.reloadData()
+        } catch {
+            // Keep existing entries on error; do nothing.
         }
     }
 
@@ -281,3 +337,22 @@ class StationDetailViewController: SimpleNotificationsViewController {
         UIApplication.shared.open(url)
     }
 }
+
+// MARK: - UITableViewDataSource
+
+extension StationDetailViewController: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        entries.count
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: TracklistCell.reuseIdentifier, for: indexPath) as! TracklistCell
+        let fallback = logoView.image
+        cell.configure(with: entries[indexPath.row], fallbackArt: fallback)
+        return cell
+    }
+}
+
+// MARK: - UITableViewDelegate
+
+extension StationDetailViewController: UITableViewDelegate {}

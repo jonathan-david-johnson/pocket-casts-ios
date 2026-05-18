@@ -19,7 +19,8 @@ struct RadioBrowserStation: Codable {
             streamUrl: url_resolved,
             donateUrl: nil,
             city: city,
-            bitrate: bitrate
+            bitrate: bitrate,
+            tracklistUrl: nil
         )
     }
 }
