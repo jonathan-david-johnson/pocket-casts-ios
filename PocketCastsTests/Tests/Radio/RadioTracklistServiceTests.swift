@@ -150,6 +150,18 @@ final class RadioTracklistServiceTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    // MARK: - Toast dedupe
+
+    func testFailureToastDedupesWithinSession() {
+        let service = RadioTracklistService()
+        XCTAssertTrue(service.shouldShowFailureToast(stationId: "kcrw"),
+                      "First failure for a station should show a toast")
+        XCTAssertFalse(service.shouldShowFailureToast(stationId: "kcrw"),
+                       "Second failure for the same station should be deduped")
+        XCTAssertTrue(service.shouldShowFailureToast(stationId: "kexp"),
+                      "First failure for a different station should still show")
+    }
 }
 
 // MARK: - Test helpers

@@ -2,7 +2,6 @@ import UIKit
 
 class StationDetailViewController: SimpleNotificationsViewController {
     private let station: RadioStation
-    private let curatedStation: CuratedStation?
 
     private let logoView: UIImageView = {
         let iv = UIImageView()
@@ -76,16 +75,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
         return btn
     }()
 
-    private lazy var donateButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.title = "Donate to \(station.displayableTitle()) ↗"
-        config.baseForegroundColor = .systemBlue
-        let btn = UIButton(configuration: config)
-        btn.translatesAutoresizingMaskIntoConstraints = false
-        btn.addAction(UIAction { [weak self] _ in self?.openDonate() }, for: .touchUpInside)
-        return btn
-    }()
-
     // MARK: - Tracklist
 
     private let tracklistTable: UITableView = {
@@ -107,9 +96,8 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private var isFavorited = false
     private var favoriteLoadTask: Task<Void, Never>?
 
-    init(station: RadioStation, curatedStation: CuratedStation? = nil) {
+    init(station: RadioStation) {
         self.station = station
-        self.curatedStation = curatedStation
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -122,11 +110,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         setupLayout()
         updatePlayButton()
 
-        // Try the curated station passed in; if absent (e.g. opened from Favorites
-        // where the caller didn't propagate it), look it up by id.
-        let resolvedCurated = curatedStation
-            ?? CuratedStationsLoader.load().first { $0.id == station.stationId }
-        if let asset = resolvedCurated?.logoAsset, let image = UIImage(named: asset) {
+        if let asset = station.logoAsset, let image = UIImage(named: asset) {
             logoView.image = image
         } else {
             logoView.image = UIImage(systemName: "radio")
@@ -198,8 +182,8 @@ class StationDetailViewController: SimpleNotificationsViewController {
         buttonStack.distribution = .fillEqually
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        // Layout: logo → name → ICY title → ICY artist → bitrate → buttons → donate
-        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, nowPlayingTitleLabel, nowPlayingArtistLabel, bitrateLabel, buttonStack, donateButton])
+        // Layout: logo → name → ICY title → ICY artist → bitrate → buttons
+        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, nowPlayingTitleLabel, nowPlayingArtistLabel, bitrateLabel, buttonStack])
         mainStack.axis = .vertical
         mainStack.spacing = 12
         mainStack.alignment = .center
@@ -207,7 +191,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
         mainStack.setCustomSpacing(2, after: nowPlayingTitleLabel)
         mainStack.setCustomSpacing(12, after: nowPlayingArtistLabel)
         mainStack.setCustomSpacing(20, after: bitrateLabel)
-        mainStack.setCustomSpacing(8, after: buttonStack)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(mainStack)
@@ -274,7 +257,11 @@ class StationDetailViewController: SimpleNotificationsViewController {
             self.entries = Array(fresh.prefix(5))
             self.tracklistTable.reloadData()
         } catch {
-            // Keep existing entries on error; do nothing.
+            // Surface one toast per session per station. The service tracks
+            // the dedupe state itself.
+            if RadioTracklistService.shared.shouldShowFailureToast(stationId: station.uuid) {
+                Toast.show("Couldn't load tracklist for \(station.displayableTitle())")
+            }
         }
     }
 
@@ -332,10 +319,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
         }
     }
 
-    private func openDonate() {
-        guard let urlString = station.donateUrl, let url = URL(string: urlString) else { return }
-        UIApplication.shared.open(url)
-    }
 }
 
 // MARK: - UITableViewDataSource

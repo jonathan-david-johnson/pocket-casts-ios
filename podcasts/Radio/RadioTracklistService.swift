@@ -14,6 +14,8 @@ final class RadioTracklistService {
     private let urlSession: URLSession
     private var cache: [String: [TracklistEntry]] = [:]
     private let cacheQueue = DispatchQueue(label: "RadioTracklistService.cache", attributes: .concurrent)
+    private var toastedStations: Set<String> = []
+    private let toastQueue = DispatchQueue(label: "RadioTracklistService.toasts")
 
     init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
@@ -25,10 +27,21 @@ final class RadioTracklistService {
         cacheQueue.sync { cache[stationId] }
     }
 
+    /// Returns true if the caller should show a failure toast for this station.
+    /// Subsequent calls within the same app session return false until the next
+    /// successful fetch resets the dedupe state.
+    func shouldShowFailureToast(stationId: String) -> Bool {
+        toastQueue.sync {
+            if toastedStations.contains(stationId) { return false }
+            toastedStations.insert(stationId)
+            return true
+        }
+    }
+
     /// Fetch the most recent plays for a curated station.
-    /// - Parameter stationId: curated station id (`"kcrw"`, `"kexp"`). For
-    ///   unknown ids returns an empty array (no throw).
-    /// - Parameter url: the station's tracklist endpoint.
+    /// - Parameter stationId: used as the cache key and dedupe key.
+    /// - Parameter url: the station's tracklist endpoint. Parser is selected
+    ///   by URL host (kcrw / kexp); unknown hosts return an empty array (no throw).
     /// Returns up to ~10 entries, most recent first.
     func fetch(stationId: String, url: String) async throws -> [TracklistEntry] {
         guard let requestURL = URL(string: url) else { throw RadioTracklistError.invalidURL }
@@ -43,16 +56,23 @@ final class RadioTracklistService {
             throw RadioTracklistError.http(http.statusCode)
         }
 
+        let host = requestURL.host?.lowercased() ?? ""
         let result: [TracklistEntry]
-        switch stationId {
-        case "kcrw": result = try parseKCRW(data: data)
-        case "kexp": result = try parseKEXP(data: data)
-        default:     result = []
+        if host.contains("kcrw") {
+            result = try parseKCRW(data: data)
+        } else if host.contains("kexp") {
+            result = try parseKEXP(data: data)
+        } else {
+            result = []
         }
+
         if !result.isEmpty {
             cacheQueue.async(flags: .barrier) { [stationId] in
                 self.cache[stationId] = result
             }
+        }
+        toastQueue.async { [stationId] in
+            self.toastedStations.remove(stationId)
         }
         return result
     }

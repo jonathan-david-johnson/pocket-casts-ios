@@ -1,27 +1,21 @@
 import Foundation
 
-struct CuratedStation: Codable {
+struct CuratedStation: Codable, Equatable {
     let id: String
     let name: String
-    let description: String
-    let streamUrl: String
-    let donateUrl: String
-    let homepageUrl: String
-    let logoAsset: String
-    let city: String
-    let bitrate: Int?
+    let description: String?
+    let logoAsset: String?
     let tracklistUrl: String?
+    let radioBrowserUUIDs: [String]
+    let defaultSeedUUID: String
     let seedAsFavorite: Bool?
 
-    func toRadioStation() -> RadioStation {
-        RadioStation(
-            stationId: id,
+    func toEnhancement() -> CuratedEnhancement {
+        CuratedEnhancement(
             name: name,
-            streamUrl: streamUrl,
-            donateUrl: donateUrl,
-            city: city,
-            bitrate: bitrate,
-            tracklistUrl: tracklistUrl
+            logoAsset: logoAsset,
+            tracklistUrl: tracklistUrl,
+            description: description
         )
     }
 }
@@ -35,6 +29,22 @@ enum CuratedStationsLoader {
         }
         return result.stations
     }
+
+    /// UUID → enhancement, built once per app session.
+    static let enhancementsByUUID: [String: CuratedEnhancement] = {
+        var index: [String: CuratedEnhancement] = [:]
+        for station in load() {
+            let enhancement = station.toEnhancement()
+            for uuid in station.radioBrowserUUIDs {
+                if index[uuid] != nil {
+                    assertionFailure("Duplicate radio-browser UUID across curated entries: \(uuid)")
+                    continue
+                }
+                index[uuid] = enhancement
+            }
+        }
+        return index
+    }()
 
     private struct StationsFile: Codable {
         let stations: [CuratedStation]

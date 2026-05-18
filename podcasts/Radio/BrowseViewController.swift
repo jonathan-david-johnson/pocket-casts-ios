@@ -167,8 +167,14 @@ extension BrowseViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: RadioStationCell.reuseId, for: indexPath) as! RadioStationCell
         let s = stations[indexPath.row]
-        let city = s.state.isEmpty ? s.country : "\(s.state), \(s.country)"
-        cell.configure(name: s.name, city: city, faviconUrl: s.favicon.isEmpty ? nil : s.favicon)
+        let state = s.state ?? ""
+        let country = s.country ?? ""
+        let city: String
+        if state.isEmpty && country.isEmpty { city = "" }
+        else if state.isEmpty { city = country }
+        else if country.isEmpty { city = state }
+        else { city = "\(state), \(country)" }
+        cell.configure(name: s.name, city: city, faviconUrl: (s.favicon ?? "").isEmpty ? nil : s.favicon)
         return cell
     }
 }

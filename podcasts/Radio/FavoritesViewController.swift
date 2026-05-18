@@ -3,23 +3,29 @@ import PocketCastsServer
 
 private struct FavoriteRow {
     let stationId: String
-    var curated: CuratedStation?
     var browse: RadioBrowserStation?
 
-    var displayName: String { curated?.name ?? browse?.name ?? stationId }
+    var displayName: String {
+        CuratedStationsLoader.enhancementsByUUID[stationId]?.name ?? browse?.name ?? stationId
+    }
     var displayCity: String {
-        if let c = curated { return c.city }
-        if let b = browse { return b.state.isEmpty ? b.country : "\(b.state), \(b.country)" }
-        return ""
+        guard let b = browse else { return "" }
+        let state = b.state ?? ""
+        let country = b.country ?? ""
+        if state.isEmpty && country.isEmpty { return "" }
+        if state.isEmpty { return country }
+        if country.isEmpty { return state }
+        return "\(state), \(country)"
     }
     var faviconUrl: String? {
-        guard let b = browse, !b.favicon.isEmpty else { return nil }
+        guard let b = browse, !(b.favicon ?? "").isEmpty else { return nil }
         return b.favicon
     }
-    var logoAsset: String? { curated?.logoAsset }
+    var logoAsset: String? {
+        CuratedStationsLoader.enhancementsByUUID[stationId]?.logoAsset
+    }
 
     func toRadioStation() -> RadioStation {
-        if let c = curated { return c.toRadioStation() }
         if let b = browse { return b.toRadioStation() }
         return RadioStation(stationId: stationId, name: stationId, streamUrl: "")
     }
@@ -28,11 +34,9 @@ private struct FavoriteRow {
 class FavoritesViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
     private var rows: [FavoriteRow] = []
-    private let curatedById: [String: CuratedStation]
     private var loadTask: Task<Void, Never>?
 
     init() {
-        curatedById = Dictionary(uniqueKeysWithValues: CuratedStationsLoader.load().map { ($0.id, $0) })
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -80,7 +84,7 @@ class FavoritesViewController: UIViewController {
             do {
                 let favorites = try await RadioFavoritesManager.shared.loadFavorites()
                 var resolved = favorites.map { fav in
-                    FavoriteRow(stationId: fav.station_id, curated: self.curatedById[fav.station_id])
+                    FavoriteRow(stationId: fav.station_id)
                 }
 
                 await MainActor.run {
@@ -89,10 +93,9 @@ class FavoritesViewController: UIViewController {
                     if resolved.isEmpty { self.showEmptyState() }
                 }
 
-                // Fetch radio-browser.info data for non-curated stations
-                let browseIndices = resolved.indices.filter { resolved[$0].curated == nil }
+                // Fetch radio-browser.info metadata for all favorited stations (all are radio-browser UUIDs).
                 await withTaskGroup(of: (Int, RadioBrowserStation?).self) { group in
-                    for i in browseIndices {
+                    for i in resolved.indices {
                         let stationId = resolved[i].stationId
                         group.addTask {
                             let station = try? await RadioBrowserAPI.station(uuid: stationId)
@@ -104,11 +107,9 @@ class FavoritesViewController: UIViewController {
                     }
                 }
 
-                if !browseIndices.isEmpty {
-                    await MainActor.run {
-                        self.rows = resolved
-                        self.tableView.reloadData()
-                    }
+                await MainActor.run {
+                    self.rows = resolved
+                    self.tableView.reloadData()
                 }
             } catch {
                 await MainActor.run { self.showEmptyState() }
@@ -171,7 +172,7 @@ extension FavoritesViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let row = rows[indexPath.row]
-        let detail = StationDetailViewController(station: row.toRadioStation(), curatedStation: row.curated)
+        let detail = StationDetailViewController(station: row.toRadioStation())
         navigationController?.pushViewController(detail, animated: true)
     }
 }

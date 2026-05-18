@@ -3,24 +3,57 @@ import Foundation
 struct RadioBrowserStation: Codable {
     let stationuuid: String
     let name: String
+    let url: String?
     let url_resolved: String
-    let favicon: String
-    let country: String
-    let state: String
-    let tags: String
-    let votes: Int
+    let favicon: String?
+    let country: String?
+    let state: String?
+    let tags: String?
+    let votes: Int?
     let bitrate: Int?
+    let codec: String?
+
+    init(
+        stationuuid: String,
+        name: String,
+        url: String? = nil,
+        url_resolved: String,
+        favicon: String? = nil,
+        country: String? = nil,
+        state: String? = nil,
+        tags: String? = nil,
+        votes: Int? = nil,
+        bitrate: Int? = nil,
+        codec: String? = nil
+    ) {
+        self.stationuuid = stationuuid
+        self.name = name
+        self.url = url
+        self.url_resolved = url_resolved
+        self.favicon = favicon
+        self.country = country
+        self.state = state
+        self.tags = tags
+        self.votes = votes
+        self.bitrate = bitrate
+        self.codec = codec
+    }
 
     func toRadioStation() -> RadioStation {
-        let city = state.isEmpty ? country : "\(state), \(country)"
+        let enhancement = CuratedStationsLoader.enhancementsByUUID[stationuuid]
+        let resolvedState = state ?? ""
+        let resolvedCountry = country ?? ""
+        let city = resolvedState.isEmpty ? resolvedCountry : "\(resolvedState), \(resolvedCountry)"
+        let displayName = enhancement?.name ?? name
         return RadioStation(
             stationId: stationuuid,
-            name: name,
+            name: displayName,
             streamUrl: url_resolved,
             donateUrl: nil,
             city: city,
             bitrate: bitrate,
-            tracklistUrl: nil
+            tracklistUrl: enhancement?.tracklistUrl,
+            logoAsset: enhancement?.logoAsset
         )
     }
 }

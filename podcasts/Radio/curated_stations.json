@@ -1,41 +1,43 @@
 {
   "stations": [
     {
-      "id": "kcrw",
-      "name": "KCRW",
-      "description": "Music and NPR news from Santa Monica",
-      "streamUrl": "https://streams.kcrw.com/e24_aac",
-      "donateUrl": "https://join.kcrw.com",
-      "homepageUrl": "https://www.kcrw.com",
+      "id": "kcrw_eclectic_24",
+      "name": "KCRW Eclectic 24",
+      "description": "Eclectic music from KCRW",
       "logoAsset": "kcrw_logo",
-      "city": "Santa Monica, CA",
-      "bitrate": 256,
       "tracklistUrl": "https://tracklist-api.kcrw.com/Music/all/1?page_size=10",
+      "radioBrowserUUIDs": [
+        "18e31f25-53c8-4213-a1ec-dccc0443a788",
+        "25ff2df8-f8ea-4af8-b283-48ba3bdcaf69",
+        "6238f5e8-a9ee-4c88-9713-2d1ab4112ac9"
+      ],
+      "defaultSeedUUID": "6238f5e8-a9ee-4c88-9713-2d1ab4112ac9",
       "seedAsFavorite": true
     },
     {
       "id": "kexp",
       "name": "KEXP",
       "description": "Where the music matters",
-      "streamUrl": "https://kexp.streamguys1.com/kexp160.aac",
-      "donateUrl": "https://www.kexp.org/donate",
-      "homepageUrl": "https://www.kexp.org",
       "logoAsset": "kexp_logo",
-      "city": "Seattle, WA",
-      "bitrate": 160,
       "tracklistUrl": "https://api.kexp.org/v2/plays/?limit=10",
+      "radioBrowserUUIDs": [
+        "445cbb3a-1c4e-49aa-a268-f5b6acfa8f2e",
+        "399ca326-0f67-4015-a51b-d7ba2bd4ebbe",
+        "a509502d-1ba7-4d51-9791-0be5a7d5ec34"
+      ],
+      "defaultSeedUUID": "445cbb3a-1c4e-49aa-a268-f5b6acfa8f2e",
       "seedAsFavorite": true
     },
     {
       "id": "npr_hourly",
-      "name": "NPR Hourly News",
+      "name": "NPR Hourly Newscast",
       "description": "Live news updates every hour",
-      "streamUrl": "http://pd.npr.org/anon.npr-mp3/npr/news/newscast.mp3",
-      "donateUrl": "https://www.npr.org/donations/support",
-      "homepageUrl": "https://www.npr.org",
       "logoAsset": "npr_logo",
-      "city": "Washington, DC",
-      "bitrate": null,
+      "tracklistUrl": null,
+      "radioBrowserUUIDs": [
+        "a5314180-7573-4b46-aafc-51ed2d5b9e71"
+      ],
+      "defaultSeedUUID": "a5314180-7573-4b46-aafc-51ed2d5b9e71",
       "seedAsFavorite": true
     }
   ]

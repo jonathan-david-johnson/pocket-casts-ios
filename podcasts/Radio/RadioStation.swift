@@ -17,6 +17,7 @@ import PocketCastsDataModel
     public let city: String?
     public let bitrate: Int?
     public let tracklistUrl: String?
+    public let logoAsset: String?
 
     public init(
         stationId: String,
@@ -25,7 +26,8 @@ import PocketCastsDataModel
         donateUrl: String? = nil,
         city: String? = nil,
         bitrate: Int? = nil,
-        tracklistUrl: String? = nil
+        tracklistUrl: String? = nil,
+        logoAsset: String? = nil
     ) {
         self.stationId = stationId
         self.streamUrl = streamUrl
@@ -33,6 +35,7 @@ import PocketCastsDataModel
         self.city = city
         self.bitrate = bitrate
         self.tracklistUrl = tracklistUrl
+        self.logoAsset = logoAsset
 
         self.uuid = stationId
         self.title = name

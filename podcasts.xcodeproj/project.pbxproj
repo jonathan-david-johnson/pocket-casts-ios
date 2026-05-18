@@ -328,6 +328,7 @@
 		4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */; };
 		4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */; };
 		4D11D3BC2FAFB7780051B62B /* CuratedStation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */; };
+		4D11D3F12FAFB7780051B62B /* CuratedEnhancement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3F02FAFB7780051B62B /* CuratedEnhancement.swift */; };
 		4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */; };
 		4D11D3C22FAFB7780051B62B /* StationDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */; };
 		4D11D3C42FAFB7780051B62B /* curated_stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D11D3C32FAFB7780051B62B /* curated_stations.json */; };
@@ -1941,6 +1942,7 @@
 		4D11D3B52FAFB7780051B62B /* RadioStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStation.swift; sourceTree = "<group>"; };
 		4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamsHostViewController.swift; sourceTree = "<group>"; };
 		4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedStation.swift; sourceTree = "<group>"; };
+		4D11D3F02FAFB7780051B62B /* CuratedEnhancement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedEnhancement.swift; sourceTree = "<group>"; };
 		4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStationCell.swift; sourceTree = "<group>"; };
 		4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationDetailViewController.swift; sourceTree = "<group>"; };
 		4D11D3C32FAFB7780051B62B /* curated_stations.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = curated_stations.json; sourceTree = "<group>"; };
@@ -3632,6 +3634,7 @@
 				4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */,
 				4D11D3B52FAFB7780051B62B /* RadioStation.swift */,
 				4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */,
+				4D11D3F02FAFB7780051B62B /* CuratedEnhancement.swift */,
 				4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */,
 				4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */,
 				4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */,
@@ -7145,6 +7148,7 @@
 				4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */,
 				4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */,
 				4D11D3BC2FAFB7780051B62B /* CuratedStation.swift in Sources */,
+				4D11D3F12FAFB7780051B62B /* CuratedEnhancement.swift in Sources */,
 				4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */,
 				4D11D3C22FAFB7780051B62B /* StationDetailViewController.swift in Sources */,
 				4D11D3C62FAFB7780051B62B /* RadioSupabase.swift in Sources */,
@@ -8204,7 +8208,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEBUG_ACTIVITY_MODE = "";
 				"DEBUG_ACTIVITY_MODE[sdk=iphonesimulator*]" = disable;
-				DEVELOPMENT_TEAM = PZYM8XX95Q;
+				DEVELOPMENT_TEAM = 77WV2LMG2L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				FIREBASE_SECRETS_PATH = "$(HOME)/.configure/pocketcasts-ios/secrets/GoogleService-Info.plist";
@@ -9301,7 +9305,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEBUG_ACTIVITY_MODE = "";
 				"DEBUG_ACTIVITY_MODE[sdk=iphonesimulator*]" = disable;
-				DEVELOPMENT_TEAM = PZYM8XX95Q;
+				DEVELOPMENT_TEAM = 77WV2LMG2L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = NO;
 				FIREBASE_SECRETS_PATH = "$(HOME)/.configure/pocketcasts-ios/secrets/GoogleService-Info.plist";
@@ -9540,7 +9544,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEBUG_ACTIVITY_MODE = "";
 				"DEBUG_ACTIVITY_MODE[sdk=iphonesimulator*]" = disable;
-				DEVELOPMENT_TEAM = PZYM8XX95Q;
+				DEVELOPMENT_TEAM = 77WV2LMG2L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				FIREBASE_SECRETS_PATH = "$(HOME)/.configure/pocketcasts-ios/secrets/GoogleService-Info.plist";
@@ -9600,7 +9604,7 @@
 				COPY_PHASE_STRIP = YES;
 				DEAD_CODE_STRIPPING = NO;
 				DEBUG_ACTIVITY_MODE = "";
-				DEVELOPMENT_TEAM = PZYM8XX95Q;
+				DEVELOPMENT_TEAM = 77WV2LMG2L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				FIREBASE_SECRETS_PATH = "$(HOME)/.configure/pocketcasts-ios/secrets/GoogleService-Info.plist";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
