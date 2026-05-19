@@ -197,6 +197,13 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
 
     @IBAction func skipBackTapped(_ sender: Any) {
         analyticsPlaybackHelper.currentSource = analyticsSource
+
+        if PlaybackManager.shared.isLiveStream() {
+            PlaybackManager.shared.toggleMute()
+            updateSkipMuteSwap()
+            return
+        }
+
         HapticsHelper.triggerSkipBackHaptic()
         PlaybackManager.shared.skipBack()
         animateSkipButton(skipBackBtn, clockwise: false)
@@ -204,9 +211,47 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
 
     @IBAction func skipForwardTapped(_ sender: Any) {
         analyticsPlaybackHelper.currentSource = analyticsSource
+
+        if PlaybackManager.shared.isLiveStream() {
+            PlaybackManager.shared.stopRadioPlayback()
+            return
+        }
+
         HapticsHelper.triggerSkipForwardHaptic()
         PlaybackManager.shared.skipForward()
         animateSkipButton(skipFwdBtn, clockwise: true)
+    }
+
+    // MARK: - Live radio: skip → mute/stop swap
+
+    @objc private func muteStateChanged() {
+        updateSkipMuteSwap()
+    }
+
+    /// Mirrors `NowPlayingPlayerItemViewController.updateSkipMuteSwap()` for the
+    /// mini player: when a `RadioStation` is current, the skip buttons become mute
+    /// + stop. The mini-player buttons are plain `UIButton`s (no Lottie chrome) so
+    /// we only need to swap the image + accessibility label.
+    func updateSkipMuteSwap() {
+        let isRadio = PlaybackManager.shared.isLiveStream()
+
+        skipFwdBtn.isHidden = isRadio
+        if isRadio {
+            let muteName = PlaybackManager.shared.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill"
+            skipBackBtn.setImage(UIImage(systemName: muteName), for: .normal)
+            skipBackBtn.accessibilityLabel = PlaybackManager.shared.isMuted ? L10n.accessibilityPlayerUnmute : L10n.accessibilityPlayerMute
+
+            skipFwdBtn.setImage(nil, for: .normal)
+            skipFwdBtn.accessibilityLabel = nil
+        } else {
+            // Restore the XIB-supplied images by clearing our overrides isn't possible
+            // (the XIB images aren't accessible after `setImage(nil)`), so we look them
+            // up from the asset catalog by name to match the original mini-player look.
+            skipBackBtn.setImage(UIImage(named: "miniplayer-skip-backward"), for: .normal)
+            skipBackBtn.accessibilityLabel = L10n.skipBack
+            skipFwdBtn.setImage(UIImage(named: "miniplayer-skip-forward"), for: .normal)
+            skipFwdBtn.accessibilityLabel = L10n.skipForward
+        }
     }
 
     private func animateSkipButton(_ button: UIButton, clockwise: Bool) {
@@ -297,6 +342,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
 
         addCustomObserver(Constants.Notifications.themeChanged, selector: #selector(themeChanged))
         addCustomObserver(Constants.Notifications.currentlyPlayingEpisodeUpdated, selector: #selector(updateRequired))
+        addCustomObserver(Constants.Notifications.playbackMuteChanged, selector: #selector(muteStateChanged))
     }
 
     func rootViewController() -> MainTabBarController? {
@@ -379,6 +425,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
         }
 
         setupForEpisode(episodePlaying)
+        updateSkipMuteSwap()
         showMiniPlayer()
         playbackProgressDidChange()
     }
@@ -494,6 +541,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
         guard let episode = PlaybackManager.shared.currentEpisode() else { return }
 
         updateColors()
+        updateSkipMuteSwap()
 
         if let userEpisode = episode as? UserEpisode {
             podcastArtwork.setUserEpisode(uuid: userEpisode.uuid, size: .list)

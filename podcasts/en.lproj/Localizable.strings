@@ -3097,6 +3097,15 @@
 /* A common string used throughout the app. Prompt to fast-forward the playback by a configurable amount. */
 "skip_forward" = "Skip Forward";
 
+/* Accessibility label for the player button that mutes audio for the currently playing live radio stream while keeping the connection open. */
+"accessibility_player_mute" = "Mute";
+
+/* Accessibility label for the player button that unmutes audio for the currently playing live radio stream. */
+"accessibility_player_unmute" = "Unmute";
+
+/* Accessibility label for the player button that stops a live radio stream and tears down playback. */
+"accessibility_player_stop" = "Stop";
+
 /* The Sleep Timer feature. */
 "sleep_timer" = "Sleep Timer";
 

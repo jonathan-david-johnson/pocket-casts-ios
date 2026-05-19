@@ -411,6 +411,16 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
 
     @IBAction func skipBackTapped(_ sender: Any) {
         analyticsPlaybackHelper.currentSource = analyticsSource
+
+        #if !APPCLIP
+        // For live radio the left button is repurposed as Mute.
+        if PlaybackManager.shared.isLiveStream() {
+            PlaybackManager.shared.toggleMute()
+            updateSkipMuteSwap()
+            return
+        }
+        #endif
+
         HapticsHelper.triggerSkipBackHaptic()
         PlaybackManager.shared.skipBack()
     }
@@ -423,6 +433,15 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
 
     @IBAction func skipFwdTapped(_ sender: Any) {
         analyticsPlaybackHelper.currentSource = analyticsSource
+
+        #if !APPCLIP
+        // For live radio the right button is repurposed as Stop.
+        if PlaybackManager.shared.isLiveStream() {
+            PlaybackManager.shared.stopRadioPlayback()
+            return
+        }
+        #endif
+
         HapticsHelper.triggerSkipForwardHaptic()
         PlaybackManager.shared.skipForward()
     }

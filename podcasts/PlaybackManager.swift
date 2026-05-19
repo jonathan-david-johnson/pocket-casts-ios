@@ -328,6 +328,47 @@ class PlaybackManager: ServerPlaybackDelegate {
         StatsManager.shared.addSkippedTime(amount)
     }
 
+    // MARK: - Mute (live radio)
+
+    /// True when the given episode (or `currentEpisode()` if nil) is a live radio
+    /// stream. We can't rely on `is RadioStation` because `load(episode:)` saves
+    /// the item into the SQLite episode table, after which `currentEpisode()`
+    /// returns an `Episode` shim with the same uuid. The in-memory
+    /// `RadioStationRegistry` is the source of truth across that round-trip.
+    func isLiveStream(_ episode: BaseEpisode? = nil) -> Bool {
+        let target = episode ?? currentEpisode()
+        guard let uuid = target?.uuid else { return false }
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        return RadioStationRegistry.shared.station(for: uuid) != nil
+        #else
+        return false
+        #endif
+    }
+
+    /// Whether playback is currently muted via the in-app mute control.
+    /// Live radio uses this in place of skip-back, so the stream stays connected
+    /// while audio is silenced. Resets to `false` whenever the current item changes.
+    private(set) var isMuted: Bool = false
+
+    /// Toggles the muted state of the active player. Setting volume to 0 keeps the
+    /// AVPlayer connection alive (no TCP teardown / preroll re-injection on unmute).
+    /// Safe to call when no player is loaded — the state still flips so the UI can
+    /// reflect it once playback begins.
+    func toggleMute() {
+        isMuted.toggle()
+        player?.setVolume(isMuted ? 0 : 1)
+        NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackMuteChanged)
+    }
+
+    /// Fully stops live radio playback: pauses the stream and tears it down so the
+    /// next play is a fresh connection (preroll expected — by design for live radio).
+    /// This is the in-app "stop" button + lock-screen stopCommand handler for radio.
+    func stopRadioPlayback() {
+        FileLog.shared.addMessage("PlaybackManager stopRadioPlayback")
+        pause(userInitiated: true)
+        endPlayback(saveCurrentEpisode: false)
+    }
+
     func skipToPreviousChapter(startPlaybackAfterSkip: Bool = false) {
         guard let previousChapter = chapterManager.previousVisibleChapter() else { return }
 
@@ -1814,9 +1855,13 @@ class PlaybackManager: ServerPlaybackDelegate {
         }
 
         commandCenter.stopCommand.addTarget { [weak self] _ -> MPRemoteCommandHandlerStatus in
-            guard let strongSelf = self, let _ = strongSelf.currentEpisode() else { return .noActionableNowPlayingItem }
+            guard let strongSelf = self, let episode = strongSelf.currentEpisode() else { return .noActionableNowPlayingItem }
 
             FileLog.shared.addMessage("Remote control: stopCommand")
+            if strongSelf.isLiveStream(episode) {
+                strongSelf.stopRadioPlayback()
+                return .success
+            }
             strongSelf.pause()
 
             return .success
@@ -1874,6 +1919,27 @@ class PlaybackManager: ServerPlaybackDelegate {
         updateExtraActions()
 
         refreshRemoteCommands()
+
+        updateRemoteCommandEnabledState(for: currentEpisode())
+    }
+
+    /// Toggles which of `skipBackward / skipForward / previousTrack / nextTrackCommand`
+    /// vs `stopCommand` are enabled on the shared `MPRemoteCommandCenter`, based on
+    /// whether the current item is a `RadioStation`. Skipping a live stream forces
+    /// a TCP reconnect (and a fresh preroll from the broadcaster), so for radio we
+    /// disable all four skip-style commands and surface `stopCommand` instead.
+    ///
+    /// `stopCommand` stays disabled for regular podcasts so we don't change the
+    /// long-standing upstream lock-screen UX.
+    func updateRemoteCommandEnabledState(for episode: BaseEpisode?) {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        let isRadio = isLiveStream(episode)
+
+        commandCenter.skipBackwardCommand.isEnabled = !isRadio
+        commandCenter.skipForwardCommand.isEnabled = !isRadio
+        commandCenter.previousTrackCommand.isEnabled = !isRadio
+        commandCenter.nextTrackCommand.isEnabled = !isRadio
+        commandCenter.stopCommand.isEnabled = isRadio
     }
 
     @objc private func refreshRemoteCommands() {
@@ -2286,6 +2352,16 @@ class PlaybackManager: ServerPlaybackDelegate {
         if FeatureFlag.limitPlaybackPositionChanges.enabled {
             episodeSwitchTime = Date()
         }
+
+        // Mute is an in-app live-radio control and must not persist across item changes
+        // (e.g. Up Next continuing to a podcast). Reset unconditionally for safety.
+        if isMuted {
+            isMuted = false
+            player?.setVolume(1)
+            NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackMuteChanged)
+        }
+
+        updateRemoteCommandEnabledState(for: currentEpisode())
     }
 
     // MARK: - Interruptions

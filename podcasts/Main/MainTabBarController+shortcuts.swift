@@ -53,10 +53,14 @@ extension MainTabBarController {
     }
 
     @objc private func handleSkipBack() {
+        // Live radio replaces skip with mute/stop (a seek would force a stream reconnect
+        // and re-trigger the broadcaster's preroll). Ignore the shortcut for radio.
+        if PlaybackManager.shared.isLiveStream() { return }
         PlaybackManager.shared.skipBack()
     }
 
     @objc private func handleSkipForward() {
+        if PlaybackManager.shared.isLiveStream() { return }
         PlaybackManager.shared.skipForward()
     }
 

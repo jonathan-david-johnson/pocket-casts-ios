@@ -20,6 +20,7 @@ extension NowPlayingPlayerItemViewController {
         addCustomObserver(Constants.Notifications.episodeDownloaded, selector: #selector(update(notification:)))
         addCustomObserver(UIApplication.willEnterForegroundNotification, selector: #selector(update(notification:)))
         addCustomObserver(Constants.Notifications.playbackFailed, selector: #selector(update(notification:)))
+        addCustomObserver(Constants.Notifications.playbackMuteChanged, selector: #selector(muteStateChanged))
 
         addCustomObserver(Constants.Notifications.sleepTimerChanged, selector: #selector(sleepTimerUpdated))
         addCustomObserver(Constants.Notifications.playerActionsUpdated, selector: #selector(reloadShelfActions))
@@ -58,6 +59,8 @@ extension NowPlayingPlayerItemViewController {
 
         let skipFwdAmount = Settings.skipForwardTime
         skipFwdBtn.skipAmount = skipFwdAmount
+
+        updateSkipMuteSwap()
 
         updatePlayPauseButton(isPlaying: PlaybackManager.shared.playing())
         updateUpTo(upTo: PlaybackManager.shared.currentTime(), duration: PlaybackManager.shared.duration(), moveSlider: true)
@@ -283,6 +286,59 @@ extension NowPlayingPlayerItemViewController {
 
         if !chapterSkipFwdBtn.isHidden {
             updateChapterProgress()
+        }
+    }
+
+    // MARK: - Live radio: skip → mute/stop swap
+
+    @objc func muteStateChanged() {
+        updateSkipMuteSwap()
+    }
+
+    /// For live radio (`RadioStation`) the left skip button becomes "Mute" and the
+    /// right skip button becomes "Stop". We reuse the existing IBOutlet slots so
+    /// XIB diffs stay minimal — only the visual chrome (Lottie animation + skip
+    /// amount label) is hidden, and a UIButton image + accessibilityLabel are set
+    /// in their place. The IBAction handlers themselves route by current-item type.
+    func updateSkipMuteSwap() {
+        #if !APPCLIP
+        let isRadio = PlaybackManager.shared.isLiveStream()
+        let tint = ThemeColor.playerContrast01()
+
+        applyRadioMode(on: skipBackBtn,
+                       isRadio: isRadio,
+                       symbolName: PlaybackManager.shared.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                       accessibilityLabel: PlaybackManager.shared.isMuted ? L10n.accessibilityPlayerUnmute : L10n.accessibilityPlayerMute,
+                       tint: tint)
+
+        // Right slot: hidden for radio (pause already serves as "stop the audio"
+        // from the user's POV; lock-screen stopCommand stays available for full
+        // teardown). Restored to its skip-forward identity for podcasts.
+        for subview in skipFwdBtn.subviews {
+            subview.isHidden = isRadio
+        }
+        skipFwdBtn.isHidden = isRadio
+        skipFwdBtn.setImage(nil, for: .normal)
+        skipFwdBtn.accessibilityLabel = nil
+        #endif
+    }
+
+    private func applyRadioMode(on button: SkipButton, isRadio: Bool, symbolName: String, accessibilityLabel: String, tint: UIColor) {
+        // Hide the SkipButton's internal Lottie + skip-amount label when showing
+        // the radio mute/stop affordance, restore them when we swap back.
+        for subview in button.subviews {
+            subview.isHidden = isRadio
+        }
+
+        if isRadio {
+            let config = UIImage.SymbolConfiguration(pointSize: 28, weight: .medium)
+            button.setImage(UIImage(systemName: symbolName, withConfiguration: config)?.withRenderingMode(.alwaysTemplate), for: .normal)
+            button.tintColor = tint
+            button.accessibilityLabel = accessibilityLabel
+        } else {
+            button.setImage(nil, for: .normal)
+            // Default a11y label comes from SkipButton's skipAmount/text content; clear our override.
+            button.accessibilityLabel = nil
         }
     }
 }
