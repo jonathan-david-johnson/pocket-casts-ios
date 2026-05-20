@@ -70,6 +70,16 @@ final class RadioTracklistService {
             cacheQueue.async(flags: .barrier) { [stationId] in
                 self.cache[stationId] = result
             }
+            // Observers (mini/big player) touch UIKit synchronously on the
+            // posting thread. `fetch` runs on a cooperative async thread, so
+            // hop to main before posting.
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: .radioTracklistDidRefresh,
+                    object: nil,
+                    userInfo: [RadioMetadataNotificationKey.stationId: stationId]
+                )
+            }
         }
         toastQueue.async { [stationId] in
             self.toastedStations.remove(stationId)
@@ -78,14 +88,27 @@ final class RadioTracklistService {
     }
 
     // MARK: - KCRW
-    // The KCRW tracklist API returns a flat JSON array of track objects.
-    // Observed fields: title, artist, album, albumImage, datetime (ISO-8601 with offset)
+    // The KCRW tracklist API (https://tracklist-api.kcrw.com/Music/all/1?page_size=10)
+    // returns a flat JSON array of track objects. Captured shape (M7.2):
+    //   {
+    //     "title": "Song Title",
+    //     "artist": "Artist Name",
+    //     "album": "Album",
+    //     "albumImage":      "https://i.scdn.co/image/abc123",   // 300x300, Spotify CDN, OFTEN NULL
+    //     "albumImageLarge": "https://i.scdn.co/image/def456",   // 640x640, Spotify CDN, OFTEN NULL
+    //     "datetime": "2026-05-18T16:32:00-07:00"
+    //   }
+    // Both `albumImage` and `albumImageLarge` are nullable (~50% of tracks have neither).
+    // We prefer `albumImageLarge` when available, falling back to `albumImage`; both nil
+    // → `TracklistEntry.albumArtURL` is nil and the artwork resolver falls through
+    // to iTunes Search → station logo.
 
     private struct KCRWTrack: Decodable {
         let title: String?       // can be null on [BREAK] rows
         let artist: String?      // also nullable defensively
         let album: String?
         let albumImage: String?
+        let albumImageLarge: String?
         let datetime: String?
     }
 
@@ -98,11 +121,12 @@ final class RadioTracklistService {
                 // Skip [BREAK] rows and anything missing title or artist.
                 guard let title = t.title, !title.isEmpty else { return nil }
                 guard let artist = t.artist, !artist.isEmpty, artist != "[BREAK]" else { return nil }
+                let imageString = t.albumImageLarge ?? t.albumImage
                 return TracklistEntry(
                     title: title,
                     artist: artist,
                     album: t.album,
-                    albumArtURL: t.albumImage.flatMap(URL.init(string:)),
+                    albumArtURL: imageString.flatMap(URL.init(string:)),
                     playedAt: t.datetime.flatMap(iso.date(from:))
                 )
             }

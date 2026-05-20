@@ -2,6 +2,8 @@ import Foundation
 import PocketCastsDataModel
 import PocketCastsServer
 import PocketCastsUtils
+import UIKit
+import Kingfisher
 
 class MiniPlayerViewController: SimpleNotificationsViewController {
     enum PlayerOpenState {
@@ -198,7 +200,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     @IBAction func skipBackTapped(_ sender: Any) {
         analyticsPlaybackHelper.currentSource = analyticsSource
 
-        if PlaybackManager.shared.isLiveStream() {
+        if PlaybackManager.shared.shouldUseMuteControls() {
             PlaybackManager.shared.toggleMute()
             updateSkipMuteSwap()
             return
@@ -212,15 +214,27 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     @IBAction func skipForwardTapped(_ sender: Any) {
         analyticsPlaybackHelper.currentSource = analyticsSource
 
-        if PlaybackManager.shared.isLiveStream() {
-            PlaybackManager.shared.stopRadioPlayback()
+        #if !APPCLIP
+        if PlaybackManager.shared.shouldUseMuteControls() {
+            presentStationDetailIfPossible()
             return
         }
+        #endif
 
         HapticsHelper.triggerSkipForwardHaptic()
         PlaybackManager.shared.skipForward()
         animateSkipButton(skipFwdBtn, clockwise: true)
     }
+
+    #if !APPCLIP
+    private func presentStationDetailIfPossible() {
+        guard let station = PlaybackManager.shared.liveStation() else { return }
+        let detail = StationDetailViewController(station: station)
+        let nav = SJUIUtils.navController(for: detail, iconStyle: .secondaryText01, themeOverride: nil)
+        let presenter = view.window?.rootViewController?.presentedViewController ?? view.window?.rootViewController
+        presenter?.present(nav, animated: true, completion: nil)
+    }
+    #endif
 
     // MARK: - Live radio: skip → mute/stop swap
 
@@ -233,16 +247,18 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     /// + stop. The mini-player buttons are plain `UIButton`s (no Lottie chrome) so
     /// we only need to swap the image + accessibility label.
     func updateSkipMuteSwap() {
-        let isRadio = PlaybackManager.shared.isLiveStream()
+        let isRadio = PlaybackManager.shared.shouldUseMuteControls()
 
-        skipFwdBtn.isHidden = isRadio
+        // Right slot for radio: Station Tracklist icon (music.note.list). Tap
+        // routed to `presentStationDetailIfPossible`. Stop only on lock screen.
+        skipFwdBtn.isUserInteractionEnabled = true
         if isRadio {
             let muteName = PlaybackManager.shared.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill"
             skipBackBtn.setImage(UIImage(systemName: muteName), for: .normal)
             skipBackBtn.accessibilityLabel = PlaybackManager.shared.isMuted ? L10n.accessibilityPlayerUnmute : L10n.accessibilityPlayerMute
 
-            skipFwdBtn.setImage(nil, for: .normal)
-            skipFwdBtn.accessibilityLabel = nil
+            skipFwdBtn.setImage(UIImage(systemName: "music.note.list"), for: .normal)
+            skipFwdBtn.accessibilityLabel = "Station tracklist"
         } else {
             // Restore the XIB-supplied images by clearing our overrides isn't possible
             // (the XIB images aren't accessible after `setImage(nil)`), so we look them
@@ -343,6 +359,11 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
         addCustomObserver(Constants.Notifications.themeChanged, selector: #selector(themeChanged))
         addCustomObserver(Constants.Notifications.currentlyPlayingEpisodeUpdated, selector: #selector(updateRequired))
         addCustomObserver(Constants.Notifications.playbackMuteChanged, selector: #selector(muteStateChanged))
+
+        #if !APPCLIP
+        addCustomObserver(.radioStationNowPlayingDidChange, selector: #selector(radioTrackArtworkChanged(notification:)))
+        addCustomObserver(.radioTracklistDidRefresh, selector: #selector(radioTracklistRefreshed(notification:)))
+        #endif
     }
 
     func rootViewController() -> MainTabBarController? {
@@ -371,7 +392,15 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
 
         if lastEpisodeUuidImageLoaded != episode.uuid {
             lastEpisodeUuidImageLoaded = episode.uuid
+            #if !APPCLIP
+            if let radio = PlaybackManager.shared.liveStation(for: episode) {
+                applyRadioBaseArtwork(for: radio)
+            } else {
+                podcastArtwork.setBaseEpisode(episode: episode, size: .list)
+            }
+            #else
             podcastArtwork.setBaseEpisode(episode: episode, size: .list)
+            #endif
         }
 
         if let episodeTitleLabel, episodeTitleLabel.text != episode.title {
@@ -546,9 +575,86 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
         if let userEpisode = episode as? UserEpisode {
             podcastArtwork.setUserEpisode(uuid: userEpisode.uuid, size: .list)
         } else {
+            #if !APPCLIP
+            if let radio = PlaybackManager.shared.liveStation(for: episode) {
+                applyRadioBaseArtwork(for: radio)
+            } else {
+                podcastArtwork.setBaseEpisode(episode: episode, size: .list)
+            }
+            #else
             podcastArtwork.setBaseEpisode(episode: episode, size: .list)
+            #endif
         }
     }
+
+    #if !APPCLIP
+    func applyRadioBaseArtwork(for station: RadioStation) {
+        podcastArtwork.imageView?.kf.cancelDownloadTask()
+        if let asset = station.logoAsset, let image = UIImage(named: asset) {
+            podcastArtwork.setImageManually(image: image, size: .list)
+        } else {
+            podcastArtwork.clearArtwork()
+        }
+    }
+
+    @objc func radioTrackArtworkChanged(notification: Notification) {
+        guard let info = notification.userInfo,
+              let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
+        let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
+        let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
+        resolveRadioArtwork(stationId: stationId, icyArtist: artist, icyTitle: title)
+    }
+
+    @objc func radioTracklistRefreshed(notification: Notification) {
+        guard let info = notification.userInfo,
+              let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
+        resolveRadioArtwork(stationId: stationId, icyArtist: "", icyTitle: "")
+    }
+
+    private func resolveRadioArtwork(stationId: String, icyArtist: String, icyTitle: String) {
+        guard let radio = PlaybackManager.shared.liveStation(),
+              radio.uuid == stationId,
+              let imageView = podcastArtwork.imageView else { return }
+
+        // Baseline first so we never show a blank slot during the async resolve.
+        applyRadioBaseArtwork(for: radio)
+
+        // Non-enhanced stations: keep station logo, no iTunes call.
+        guard let enhancement = CuratedStationsLoader.enhancementsByUUID[stationId],
+              enhancement.tracklistUrl != nil else { return }
+
+        guard let resolveEntry = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: icyArtist, icyTitle: icyTitle) else { return }
+
+        let resolvedArtist = resolveEntry.artist
+        let resolvedTitle = resolveEntry.title
+
+        TrackArtworkResolver.shared.artworkURL(for: resolveEntry, station: radio) { [weak self] url in
+            // Resolver completes off-main; UIImageView + Kingfisher writes
+            // require the main thread.
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard let current = PlaybackManager.shared.liveStation(),
+                      current.uuid == stationId else { return }
+                // Stale-guard: if a newer resolve has overtaken (different
+                // top tracklist entry now), drop this completion.
+                if let newest = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: "", icyTitle: ""),
+                   newest.artist != resolvedArtist || newest.title != resolvedTitle {
+                    return
+                }
+
+                if let url {
+                    imageView.kf.setImage(with: url, placeholder: imageView.image, options: [.transition(.fade(0.2))]) { [weak self] result in
+                        if case .failure = result {
+                            self?.applyRadioBaseArtwork(for: radio)
+                        }
+                    }
+                } else {
+                    self.applyRadioBaseArtwork(for: radio)
+                }
+            }
+        }
+    }
+    #endif
 
     func showUpNext(from source: UpNextViewSource) {
         upNextViewController = UpNextViewController(source: source)

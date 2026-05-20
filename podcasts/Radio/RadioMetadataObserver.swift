@@ -3,6 +3,11 @@ import Foundation
 
 extension Notification.Name {
     static let radioStationNowPlayingDidChange = Notification.Name("radioStationNowPlayingDidChange")
+    /// Posted by `RadioTracklistService` when a fetch lands fresh (non-empty)
+    /// entries. Observers use this to refresh now-playing artwork from the
+    /// tracklist's top entry when ICY metadata is missing/unparseable.
+    /// userInfo: `RadioMetadataNotificationKey.stationId` only.
+    static let radioTracklistDidRefresh = Notification.Name("radioTracklistDidRefresh")
 }
 
 enum RadioMetadataNotificationKey {

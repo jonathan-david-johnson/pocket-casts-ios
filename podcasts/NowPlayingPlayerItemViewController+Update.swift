@@ -3,6 +3,8 @@ import PocketCastsServer
 import PocketCastsUtils
 import PocketCastsDataModel
 import SafariServices
+import UIKit
+import Kingfisher
 
 extension NowPlayingPlayerItemViewController {
     func addObservers() {
@@ -21,6 +23,11 @@ extension NowPlayingPlayerItemViewController {
         addCustomObserver(UIApplication.willEnterForegroundNotification, selector: #selector(update(notification:)))
         addCustomObserver(Constants.Notifications.playbackFailed, selector: #selector(update(notification:)))
         addCustomObserver(Constants.Notifications.playbackMuteChanged, selector: #selector(muteStateChanged))
+
+        #if !APPCLIP
+        addCustomObserver(.radioStationNowPlayingDidChange, selector: #selector(radioTrackArtworkChanged(notification:)))
+        addCustomObserver(.radioTracklistDidRefresh, selector: #selector(radioTracklistRefreshed(notification:)))
+        #endif
 
         addCustomObserver(Constants.Notifications.sleepTimerChanged, selector: #selector(sleepTimerUpdated))
         addCustomObserver(Constants.Notifications.playerActionsUpdated, selector: #selector(reloadShelfActions))
@@ -74,9 +81,105 @@ extension NowPlayingPlayerItemViewController {
             updateError()
         }
         if !showingCustomImage {
+            #if !APPCLIP
+            if let radio = PlaybackManager.shared.liveStation(for: playingEpisode) {
+                applyRadioBaseArtwork(for: radio)
+                // Catch-up: tracklist refresh notification may have already
+                // fired before this VC's observers existed (player only
+                // instantiated when user expands it). Resolve once from
+                // cached tracklist top entry so art appears immediately.
+                resolveRadioArtwork(stationId: radio.uuid, icyArtist: "", icyTitle: "")
+            } else {
+                // Strip any radio chrome we may have set previously so podcast
+                // art renders with its default XIB styling.
+                episodeImage.backgroundColor = .clear
+                episodeImage.layer.cornerRadius = 0
+                ImageManager.sharedManager.loadImage(episode: playingEpisode, imageView: episodeImage, size: .page)
+            }
+            #else
             ImageManager.sharedManager.loadImage(episode: playingEpisode, imageView: episodeImage, size: .page)
+            #endif
         }
     }
+
+    #if !APPCLIP
+    /// Sets the player's main artwork to the curated station logo as a baseline.
+    /// `radioTrackArtworkChanged(notification:)` will overwrite it with per-track
+    /// art if/when a tracklist tick resolves one.
+    private func applyRadioBaseArtwork(for station: RadioStation) {
+        episodeImage.kf.cancelDownloadTask()
+        episodeImage.isHidden = false
+        episodeImage.alpha = 1.0
+        episodeImage.layer.opacity = 1.0
+        // Mirror StationDetailViewController's logoView chrome so the station
+        // logo (often a dark glyph on transparent) is readable on the player's
+        // dark background. Same gray rounded plate keeps the two surfaces in
+        // sync visually.
+        episodeImage.contentMode = .scaleAspectFit
+        episodeImage.backgroundColor = .secondarySystemBackground
+        episodeImage.layer.cornerRadius = 12
+        episodeImage.clipsToBounds = true
+        if let asset = station.logoAsset, let image = UIImage(named: asset) {
+            episodeImage.image = image
+        } else {
+            episodeImage.image = ImageManager.sharedManager.placeHolderImage(.page)
+        }
+    }
+
+    @objc func radioTrackArtworkChanged(notification: Notification) {
+        guard let info = notification.userInfo,
+              let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
+        let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
+        let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
+        resolveRadioArtwork(stationId: stationId, icyArtist: artist, icyTitle: title)
+    }
+
+    @objc func radioTracklistRefreshed(notification: Notification) {
+        guard let info = notification.userInfo,
+              let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
+        resolveRadioArtwork(stationId: stationId, icyArtist: "", icyTitle: "")
+    }
+
+    private func resolveRadioArtwork(stationId: String, icyArtist: String, icyTitle: String) {
+        guard let radio = PlaybackManager.shared.liveStation(),
+              radio.uuid == stationId else { return }
+
+        // Always paint the station logo as baseline before any async resolve.
+        applyRadioBaseArtwork(for: radio)
+
+        // Non-enhanced stations: keep station logo, no iTunes call.
+        guard let enhancement = CuratedStationsLoader.enhancementsByUUID[stationId],
+              enhancement.tracklistUrl != nil else { return }
+
+        guard let resolveEntry = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: icyArtist, icyTitle: icyTitle) else { return }
+
+        let resolvedArtist = resolveEntry.artist
+        let resolvedTitle = resolveEntry.title
+
+        TrackArtworkResolver.shared.artworkURL(for: resolveEntry, station: radio) { [weak self] url in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                // Stale-guards: station and best entry still match.
+                guard let current = PlaybackManager.shared.liveStation(),
+                      current.uuid == stationId else { return }
+                if let newest = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: "", icyTitle: ""),
+                   newest.artist != resolvedArtist || newest.title != resolvedTitle {
+                    return
+                }
+
+                if let url {
+                    self.episodeImage.kf.setImage(with: url, placeholder: self.episodeImage.image, options: [.transition(.fade(0.2))]) { [weak self] result in
+                        if case .failure = result {
+                            self?.applyRadioBaseArtwork(for: radio)
+                        }
+                    }
+                } else {
+                    self.applyRadioBaseArtwork(for: radio)
+                }
+            }
+        }
+    }
+    #endif
 
     private func updateColors() {
         let backgroundColor = PlayerColorHelper.playerBackgroundColor01()
@@ -302,7 +405,7 @@ extension NowPlayingPlayerItemViewController {
     /// in their place. The IBAction handlers themselves route by current-item type.
     func updateSkipMuteSwap() {
         #if !APPCLIP
-        let isRadio = PlaybackManager.shared.isLiveStream()
+        let isRadio = PlaybackManager.shared.shouldUseMuteControls()
         let tint = ThemeColor.playerContrast01()
 
         applyRadioMode(on: skipBackBtn,
@@ -311,15 +414,16 @@ extension NowPlayingPlayerItemViewController {
                        accessibilityLabel: PlaybackManager.shared.isMuted ? L10n.accessibilityPlayerUnmute : L10n.accessibilityPlayerMute,
                        tint: tint)
 
-        // Right slot: hidden for radio (pause already serves as "stop the audio"
-        // from the user's POV; lock-screen stopCommand stays available for full
-        // teardown). Restored to its skip-forward identity for podcasts.
-        for subview in skipFwdBtn.subviews {
-            subview.isHidden = isRadio
-        }
-        skipFwdBtn.isHidden = isRadio
-        skipFwdBtn.setImage(nil, for: .normal)
-        skipFwdBtn.accessibilityLabel = nil
+        // Right slot: for radio, repurpose as Station Tracklist. Hide internal
+        // chrome (Lottie + skip-amount label), put a list icon in its place,
+        // route tap to `presentStationDetailIfPossible`. Stop is only on lock
+        // screen (stopCommand).
+        applyRadioMode(on: skipFwdBtn,
+                       isRadio: isRadio,
+                       symbolName: "music.note.list",
+                       accessibilityLabel: "Station tracklist",
+                       tint: tint)
+        skipFwdBtn.isUserInteractionEnabled = true
         #endif
     }
 

@@ -5,6 +5,7 @@ import PocketCastsServer
 import PocketCastsUtils
 import UIKit
 import Combine
+import Kingfisher
 
 class PlaybackManager: ServerPlaybackDelegate {
     static let shared = PlaybackManager()
@@ -98,6 +99,10 @@ class PlaybackManager: ServerPlaybackDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(updateNowPlayingInfo), name: Constants.Notifications.userEpisodeUpdated, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(updateAllNowPlayingData), name: .episodeEmbeddedArtworkLoaded, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurrentlyPlayingEpisodeUpdated), name: Constants.Notifications.currentlyPlayingEpisodeUpdated, object: nil)
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRadioTrackChanged(_:)), name: .radioStationNowPlayingDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRadioTracklistRefreshed(_:)), name: .radioTracklistDidRefresh, object: nil)
+        #endif
 
         // run these on a background queue because some of them might call our singleton instance back, causing a crash because PlaybackManager.shared is called from the init method
         DispatchQueue.global().async {
@@ -336,14 +341,103 @@ class PlaybackManager: ServerPlaybackDelegate {
     /// returns an `Episode` shim with the same uuid. The in-memory
     /// `RadioStationRegistry` is the source of truth across that round-trip.
     func isLiveStream(_ episode: BaseEpisode? = nil) -> Bool {
-        let target = episode ?? currentEpisode()
-        guard let uuid = target?.uuid else { return false }
         #if !os(watchOS) && !APPCLIP && !os(tvOS)
-        return RadioStationRegistry.shared.station(for: uuid) != nil
+        return liveStation(for: episode) != nil
         #else
+        _ = episode
         return false
         #endif
     }
+
+    /// True when the in-app skip buttons should be swapped to mute. We swap
+    /// only when the item is BOTH a live radio entry AND unseekable
+    /// (indefinite AVPlayerItem duration). A `RadioStation` whose stream URL
+    /// resolves to a finite MP3 (e.g. NPR Hourly Newscast) keeps skip controls
+    /// because the user can actually seek inside the file.
+    func shouldUseMuteControls(for episode: BaseEpisode? = nil) -> Bool {
+        guard isLiveStream(episode) else { return false }
+        return (player?.duration() ?? -1) <= 0
+    }
+
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
+    /// Returns the `RadioStation` for the given episode (or `currentEpisode()`
+    /// if nil). Use this anywhere you'd otherwise write `episode as? RadioStation`
+    /// — the cast fails after `load(episode:)` round-trips through SQLite and
+    /// turns the queue entry into an `Episode` shim. Registry remembers original.
+    func liveStation(for episode: BaseEpisode? = nil) -> RadioStation? {
+        let target = episode ?? currentEpisode()
+        guard let uuid = target?.uuid else { return nil }
+        return RadioStationRegistry.shared.station(for: uuid)
+    }
+    #endif
+
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
+    /// Coalesce repeat resolves for the same (artist, title) pair.
+    private var lastResolvedRadioKey: String?
+
+    /// Live-radio track change. Resolves per-track artwork via
+    /// `TrackArtworkResolver` → loads it via Kingfisher → swaps the
+    /// `MPNowPlayingInfoCenter` artwork. UI surfaces (full + mini player)
+    /// run the same resolve independently via their own observers, sharing
+    /// `KingfisherManager.shared`'s cache so the network round-trip happens
+    /// at most once per track.
+    @objc private func handleRadioTrackChanged(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
+        let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
+        let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
+        resolveRadioArtworkForLockScreen(stationId: stationId, icyArtist: artist, icyTitle: title)
+    }
+
+    @objc private func handleRadioTracklistRefreshed(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
+        // No ICY info on this path — let helper pick top tracklist entry.
+        resolveRadioArtworkForLockScreen(stationId: stationId, icyArtist: "", icyTitle: "")
+    }
+
+    private func resolveRadioArtworkForLockScreen(stationId: String, icyArtist: String, icyTitle: String) {
+        guard let station = RadioStationRegistry.shared.station(for: stationId) else { return }
+        // Only act when this station is the one currently playing.
+        guard currentEpisode()?.uuid == stationId else { return }
+        // Non-enhanced stations (no curated tracklistUrl) stay on the station logo.
+        guard let enhancement = CuratedStationsLoader.enhancementsByUUID[stationId],
+              enhancement.tracklistUrl != nil else { return }
+        guard let resolveEntry = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: icyArtist, icyTitle: icyTitle) else { return }
+
+        let key = "\(stationId)\u{1F}\(resolveEntry.artist.lowercased())\u{1F}\(resolveEntry.title.lowercased())"
+        if key == lastResolvedRadioKey { return }
+        lastResolvedRadioKey = key
+
+        TrackArtworkResolver.shared.artworkURL(for: resolveEntry, station: station) { [weak self] url in
+            guard let self else { return }
+            // Bail if the track has since changed.
+            guard self.lastResolvedRadioKey == key else { return }
+            // Bail if the current episode has since changed away from this radio station.
+            guard self.currentEpisode()?.uuid == stationId else { return }
+
+            // `setArtworkImage` mutates `MPNowPlayingInfoCenter.nowPlayingInfo`
+            // which is main-thread only. Kingfisher's completion fires on a
+            // background queue, so dispatch to main.
+            if let url {
+                KingfisherManager.shared.retrieveImage(with: url) { result in
+                    guard self.lastResolvedRadioKey == key else { return }
+                    DispatchQueue.main.async {
+                        if let image = try? result.get().image {
+                            NowPlayingHelper.setArtworkImage(image)
+                        } else if let logo = NowPlayingHelper.stationLogoImage(for: station) {
+                            NowPlayingHelper.setArtworkImage(logo)
+                        }
+                    }
+                }
+            } else if let logo = NowPlayingHelper.stationLogoImage(for: station) {
+                DispatchQueue.main.async {
+                    NowPlayingHelper.setArtworkImage(logo)
+                }
+            }
+        }
+    }
+    #endif
 
     /// Whether playback is currently muted via the in-app mute control.
     /// Live radio uses this in place of skip-back, so the stream stays connected
@@ -1858,7 +1952,7 @@ class PlaybackManager: ServerPlaybackDelegate {
             guard let strongSelf = self, let episode = strongSelf.currentEpisode() else { return .noActionableNowPlayingItem }
 
             FileLog.shared.addMessage("Remote control: stopCommand")
-            if strongSelf.isLiveStream(episode) {
+            if strongSelf.shouldUseMuteControls(for: episode) {
                 strongSelf.stopRadioPlayback()
                 return .success
             }
@@ -1933,7 +2027,10 @@ class PlaybackManager: ServerPlaybackDelegate {
     /// long-standing upstream lock-screen UX.
     func updateRemoteCommandEnabledState(for episode: BaseEpisode?) {
         let commandCenter = MPRemoteCommandCenter.shared()
-        let isRadio = isLiveStream(episode)
+        // Use shouldUseMuteControls so a `RadioStation` that resolves to a
+        // finite MP3 (NPR Hourly Newscast) keeps skip enabled and stop
+        // disabled — same as a regular podcast.
+        let isRadio = shouldUseMuteControls(for: episode)
 
         commandCenter.skipBackwardCommand.isEnabled = !isRadio
         commandCenter.skipForwardCommand.isEnabled = !isRadio

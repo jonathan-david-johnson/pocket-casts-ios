@@ -414,7 +414,7 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
 
         #if !APPCLIP
         // For live radio the left button is repurposed as Mute.
-        if PlaybackManager.shared.isLiveStream() {
+        if PlaybackManager.shared.shouldUseMuteControls() {
             PlaybackManager.shared.toggleMute()
             updateSkipMuteSwap()
             return
@@ -435,9 +435,9 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         analyticsPlaybackHelper.currentSource = analyticsSource
 
         #if !APPCLIP
-        // For live radio the right button is repurposed as Stop.
-        if PlaybackManager.shared.isLiveStream() {
-            PlaybackManager.shared.stopRadioPlayback()
+        // For live radio the right button is repurposed as Station Tracklist.
+        if PlaybackManager.shared.shouldUseMuteControls() {
+            presentStationDetailIfPossible()
             return
         }
         #endif
@@ -445,6 +445,15 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         HapticsHelper.triggerSkipForwardHaptic()
         PlaybackManager.shared.skipForward()
     }
+
+    #if !APPCLIP
+    private func presentStationDetailIfPossible() {
+        guard let station = PlaybackManager.shared.liveStation() else { return }
+        let detail = StationDetailViewController(station: station)
+        let nav = SJUIUtils.navController(for: detail, iconStyle: .secondaryText01, themeOverride: nil)
+        present(nav, animated: true, completion: nil)
+    }
+    #endif
 
     @IBAction func chapterSkipBackTapped(_ sender: Any) {
         PlaybackManager.shared.skipToPreviousChapter()

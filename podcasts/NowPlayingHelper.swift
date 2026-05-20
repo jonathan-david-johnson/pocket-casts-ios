@@ -28,6 +28,24 @@ class NowPlayingHelper {
         var nowPlayingInfoWithProgress = NowPlayingHelper.addUpToInformationToNowPlaying(playingInfo, duration: duration, upTo: upTo, playbackRate: playbackRate)
 
         let size = ImageManager.sizeFor(imageSize: .page)
+
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        // Live radio: ImageManager.imageForEpisode returns nil for RadioStation
+        // (it has no parent podcast). Use the curated station logo asset as the
+        // baseline artwork, and let RadioArtworkCoordinator overwrite it with
+        // per-track art when a tracklist tick resolves one.
+        if let radio = PlaybackManager.shared.liveStation(for: episode) {
+            let stationLogo = stationLogoImage(for: radio)
+            let imageToUse = stationLogo ?? UIImage(named: "noartwork-page")!
+            let artwork = MPMediaItemArtwork(boundsSize: CGSize(width: size, height: size), requestHandler: { _ -> UIImage in
+                imageToUse
+            })
+            nowPlayingInfoWithProgress[MPMediaItemPropertyArtwork] = artwork
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoWithProgress
+            return
+        }
+        #endif
+
         ImageManager.sharedManager.imageForEpisode(episode, size: .page) { image in
             let imageToUse = image ?? UIImage(named: "noartwork-page")!
 
@@ -39,6 +57,33 @@ class NowPlayingHelper {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoWithProgress
         }
     }
+
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
+    /// Loads the station logo bundled asset for a curated radio station.
+    /// Returns nil for non-curated stations (radio-browser ones without a
+    /// `logoAsset`).
+    class func stationLogoImage(for station: RadioStation) -> UIImage? {
+        if let asset = station.logoAsset, let image = UIImage(named: asset) {
+            return image
+        }
+        return nil
+    }
+
+    /// Replace `MPMediaItemPropertyArtwork` for the current `nowPlayingInfo`
+    /// entry without re-serialising the full info dict. Used by the radio
+    /// artwork coordinator on tracklist ticks. The `image` is captured by the
+    /// `requestHandler` closure — it does NOT retain `self` and there is no
+    /// cycle on `PlaybackManager`.
+    class func setArtworkImage(_ image: UIImage) {
+        let size = ImageManager.sizeFor(imageSize: .page)
+        let artwork = MPMediaItemArtwork(boundsSize: CGSize(width: size, height: size), requestHandler: { _ -> UIImage in
+            image
+        })
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPMediaItemPropertyArtwork] = artwork
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+    #endif
 
     class func clearNowPlayingInfo() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
