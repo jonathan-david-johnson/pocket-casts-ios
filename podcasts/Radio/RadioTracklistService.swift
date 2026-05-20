@@ -27,6 +27,25 @@ final class RadioTracklistService {
         cacheQueue.sync { cache[stationId] }
     }
 
+    #if DEBUG
+    /// Test-only: seed the in-memory cache without going through `fetch`.
+    /// Lets unit tests exercise `TrackArtworkResolver.bestResolveEntry` and
+    /// observers that read from the shared cache.
+    func _seedCacheForTesting(stationId: String, entries: [TracklistEntry]) {
+        cacheQueue.async(flags: .barrier) { [stationId] in
+            self.cache[stationId] = entries
+        }
+        cacheQueue.sync(flags: .barrier) {}
+    }
+
+    func _clearCacheForTesting(stationId: String) {
+        cacheQueue.async(flags: .barrier) { [stationId] in
+            self.cache.removeValue(forKey: stationId)
+        }
+        cacheQueue.sync(flags: .barrier) {}
+    }
+    #endif
+
     /// Returns true if the caller should show a failure toast for this station.
     /// Subsequent calls within the same app session return false until the next
     /// successful fetch resets the dedupe state.

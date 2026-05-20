@@ -34,6 +34,33 @@ final class RadioMetadataObserverTests: XCTestCase {
         XCTAssertEqual(result?.title, "Track")
     }
 
+    // MARK: - Junk title rejection (station automation pseudo-songs)
+
+    func testRejectsPrerollAsTitle() {
+        XCTAssertNil(makeObserver().parseStreamTitle("StreamTitle='preroll';"))
+    }
+
+    func testRejectsMidrollAsTitle() {
+        XCTAssertNil(makeObserver().parseStreamTitle("StreamTitle='midroll';"))
+    }
+
+    func testRejectsBreakBracketRow() {
+        XCTAssertNil(makeObserver().parseStreamTitle("StreamTitle='[BREAK]';"))
+    }
+
+    // MARK: - KCRW ICY shape (no-space dash)
+
+    /// KCRW emits `StreamTitle='Title-Artist-Album'` with no spaces around the
+    /// dashes. The parser only splits on `" - "` (space-padded), so this returns
+    /// `(artist: "", title: full)`. M7.2 routes this through
+    /// `TrackArtworkResolver.bestResolveEntry`, which prefers the cached
+    /// tracklist's top entry over the un-parseable ICY frame.
+    func testParsesKCRWStyleNoSpaceDashAsTitleOnly() {
+        let result = makeObserver().parseStreamTitle("StreamTitle='Infinity-Hohnen Ford-Infinity';")
+        XCTAssertEqual(result?.artist, "")
+        XCTAssertEqual(result?.title, "Infinity-Hohnen Ford-Infinity")
+    }
+
     func testDedupesIdenticalConsecutiveEmissions() {
         let observer = makeObserver()
         var count = 0

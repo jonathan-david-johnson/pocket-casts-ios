@@ -430,7 +430,11 @@ extension NowPlayingPlayerItemViewController {
     private func applyRadioMode(on button: SkipButton, isRadio: Bool, symbolName: String, accessibilityLabel: String, tint: UIColor) {
         // Hide the SkipButton's internal Lottie + skip-amount label when showing
         // the radio mute/stop affordance, restore them when we swap back.
-        for subview in button.subviews {
+        // CRITICAL: skip UIButton's own `imageView` and `titleLabel` — when
+        // `setImage` populates the image view it gets added to `subviews`, so a
+        // blanket loop on a subsequent `update(notification:)` (e.g. on pause)
+        // would hide the radio icon along with the chrome.
+        for subview in button.subviews where subview !== button.imageView && subview !== button.titleLabel {
             subview.isHidden = isRadio
         }
 

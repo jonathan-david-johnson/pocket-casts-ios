@@ -349,8 +349,24 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
                 }
 
                 #if !os(watchOS)
-                    createAudioMix()
-                    player?.currentItem?.audioMix = audioMix
+                    // Live radio (ICY/AAC live streams) chokes the
+                    // MTAudioProcessingTap on device — observed
+                    // `CoreMediaErrorDomain -66681` immediately after audio
+                    // session activation. The tap is only needed for effects
+                    // (boost / trim silence / preak limiter) which aren't
+                    // exposed on radio anyway. Skip the audio mix entirely
+                    // when this is a `RadioStation`.
+                    let skipAudioMix: Bool = {
+                        #if !APPCLIP && !os(tvOS)
+                        return episodeUuid.flatMap { RadioStationRegistry.shared.station(for: $0) } != nil
+                        #else
+                        return false
+                        #endif
+                    }()
+                    if !skipAudioMix {
+                        createAudioMix()
+                        player?.currentItem?.audioMix = audioMix
+                    }
                 #endif
 
                 isWaitingForInitialPlayback = false

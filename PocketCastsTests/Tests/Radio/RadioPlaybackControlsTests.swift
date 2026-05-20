@@ -111,6 +111,19 @@ final class RadioPlaybackControlsTests: XCTestCase {
         XCTAssertFalse(commandCenter.stopCommand.isEnabled)
     }
 
+    // MARK: - shouldUseMuteControls (M7.2)
+
+    func testShouldUseMuteControlsTrueForLiveRadioWithoutPlayer() {
+        // No AVPlayer attached → `player?.duration() ?? -1` is -1 which is ≤ 0,
+        // so a registered live radio station correctly qualifies for the mute
+        // swap. Mirrors the live-stream case (indefinite duration).
+        XCTAssertTrue(manager.shouldUseMuteControls(for: makeRadioStation()))
+    }
+
+    func testShouldUseMuteControlsFalseForRegularPodcastEpisode() {
+        XCTAssertFalse(manager.shouldUseMuteControls(for: makePodcastEpisode()))
+    }
+
     // MARK: - Mute state
 
     func testToggleMuteFlipsIsMuted() {
