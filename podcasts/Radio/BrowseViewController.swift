@@ -17,9 +17,20 @@ class BrowseViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        applyTheme()
         setupLayout()
         loadTopStations()
+        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
+    }
+
+    @objc private func themeDidChange() {
+        applyTheme()
+        tableView.reloadData()
+    }
+
+    private func applyTheme() {
+        view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        tableView.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -101,7 +112,7 @@ class BrowseViewController: UIViewController {
         let container = UIView()
         let label = UILabel()
         label.text = text
-        label.textColor = .secondaryLabel
+        label.textColor = AppTheme.colorForStyle(.primaryText02)
         label.textAlignment = .center
         label.numberOfLines = 0
         label.font = .systemFont(ofSize: 15)

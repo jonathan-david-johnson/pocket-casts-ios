@@ -8,7 +8,7 @@ class RadioStationCell: UITableViewCell {
         iv.contentMode = .scaleAspectFit
         iv.layer.cornerRadius = 8
         iv.clipsToBounds = true
-        iv.backgroundColor = .secondarySystemBackground
+        iv.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -16,6 +16,7 @@ class RadioStationCell: UITableViewCell {
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 16, weight: .semibold)
+        l.textColor = AppTheme.colorForStyle(.primaryText01)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -23,7 +24,7 @@ class RadioStationCell: UITableViewCell {
     private let cityLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 13)
-        l.textColor = .secondaryLabel
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -31,6 +32,7 @@ class RadioStationCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         accessoryType = .disclosureIndicator
+        backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         setupLayout()
     }
 
@@ -60,25 +62,38 @@ class RadioStationCell: UITableViewCell {
     }
 
     func configure(name: String, city: String, logoAsset: String?) {
+        applyTheme()
         nameLabel.text = name
         cityLabel.text = city
         if let asset = logoAsset, let image = UIImage(named: asset) {
             logoView.image = image
         } else {
             logoView.image = UIImage(systemName: "radio")
-            logoView.tintColor = .secondaryLabel
+            logoView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
         }
     }
 
     func configure(name: String, city: String, faviconUrl: String?) {
+        applyTheme()
         nameLabel.text = name
         cityLabel.text = city
         logoView.image = UIImage(systemName: "radio")
-        logoView.tintColor = .secondaryLabel
+        logoView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
         guard let urlString = faviconUrl, let url = URL(string: urlString) else { return }
         URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
             guard let data, let image = UIImage(data: data) else { return }
             DispatchQueue.main.async { self?.logoView.image = image }
         }.resume()
+    }
+
+    /// Cells are reused — re-read theme colours every configure so a theme
+    /// change in Settings propagates immediately on the next
+    /// `tableView.reloadData()` (no restart).
+    private func applyTheme() {
+        backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        contentView.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        nameLabel.textColor = AppTheme.colorForStyle(.primaryText01)
+        cityLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        logoView.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
     }
 }

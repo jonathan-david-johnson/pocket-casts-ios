@@ -28,7 +28,8 @@ class StreamsHostViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        applyTheme()
+        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
 
         let tv = SegmentedTitleView(leading: .favorites, trailing: .browse)
         tv.onSelect = { [weak self] segment in
@@ -94,5 +95,13 @@ class StreamsHostViewController: UIViewController {
         if let pc = newChild as? PCViewController {
             pc.refreshRightButtons()
         }
+    }
+
+    @objc private func themeDidChange() {
+        applyTheme()
+    }
+
+    private func applyTheme() {
+        view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
     }
 }

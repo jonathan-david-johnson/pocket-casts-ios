@@ -146,6 +146,8 @@ extension NowPlayingPlayerItemViewController {
 
         // Always paint the station logo as baseline before any async resolve.
         applyRadioBaseArtwork(for: radio)
+        // Refresh title/subtitle to reflect the now-playing track.
+        applyRadioTrackLabelsIfApplicable()
 
         // Non-enhanced stations: keep station logo, no iTunes call.
         guard let enhancement = CuratedStationsLoader.enhancementsByUUID[stationId],
@@ -246,8 +248,44 @@ extension NowPlayingPlayerItemViewController {
             podcastName.text = playingEpisode.subTitle()
             showingCustomImage = false
             chapterLink.isHidden = true
+            #if !APPCLIP
+            applyRadioTrackLabelsIfApplicable()
+            #endif
         }
     }
+
+    #if !APPCLIP
+    /// For live radio, override the player's title/subtitle with the
+    /// currently-playing track (artist — title) when known. Falls back to
+    /// station name when no metadata yet. Called from `updateChapterInfo`
+    /// (initial load + chapter ticks) and from the radio notification
+    /// observers (`radioTrackArtworkChanged`, `radioTracklistRefreshed`).
+    func applyRadioTrackLabelsIfApplicable() {
+        guard let playingEpisode = PlaybackManager.shared.currentEpisode(),
+              let radio = PlaybackManager.shared.liveStation(for: playingEpisode) else { return }
+
+        guard let enhancement = CuratedStationsLoader.enhancementsByUUID[radio.uuid],
+              enhancement.tracklistUrl != nil else {
+            // Non-enhanced station: keep the station's own title/subtitle.
+            return
+        }
+
+        guard let entry = TrackArtworkResolver.bestResolveEntry(stationId: radio.uuid, icyArtist: "", icyTitle: "") else {
+            // No cached tracklist + no ICY yet → leave station name in place.
+            return
+        }
+
+        episodeName.text = entry.title
+        // Compose "Artist — Station Name" for the subtitle so the user
+        // still knows which station they're tuned to.
+        let stationName = radio.displayableTitle()
+        if !entry.artist.isEmpty {
+            podcastName.text = "\(entry.artist) — \(stationName)"
+        } else {
+            podcastName.text = stationName
+        }
+    }
+    #endif
 
     private func updateChapterProgress(for chapter: ChapterInfo?, playheadPosition: TimeInterval) {
         guard let chapter else {

@@ -6,6 +6,7 @@ final class TracklistCell: UITableViewCell {
     private let titleLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 17, weight: .semibold)
+        l.textColor = AppTheme.colorForStyle(.primaryText01)
         l.numberOfLines = 2
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -14,7 +15,7 @@ final class TracklistCell: UITableViewCell {
     private let artistLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 15)
-        l.textColor = .secondaryLabel
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
         l.numberOfLines = 1
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -23,7 +24,7 @@ final class TracklistCell: UITableViewCell {
     private let albumLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 15)
-        l.textColor = .secondaryLabel
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
         l.numberOfLines = 1
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -34,7 +35,7 @@ final class TracklistCell: UITableViewCell {
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
         iv.layer.cornerRadius = 4
-        iv.backgroundColor = .secondarySystemBackground
+        iv.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -45,6 +46,7 @@ final class TracklistCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .none
+        backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         contentView.addSubview(titleLabel)
         contentView.addSubview(artistLabel)
         contentView.addSubview(albumLabel)
@@ -87,6 +89,7 @@ final class TracklistCell: UITableViewCell {
     }
 
     func configure(with entry: TracklistEntry, fallbackArt: UIImage? = nil) {
+        applyTheme()
         titleLabel.text = entry.title
         artistLabel.text = entry.artist
         albumLabel.text = entry.album
@@ -104,5 +107,16 @@ final class TracklistCell: UITableViewCell {
             }
         }
         artLoadTask?.resume()
+    }
+
+    /// Cells are reused — re-read theme colours every configure so a theme
+    /// change propagates on the next `tableView.reloadData()`.
+    private func applyTheme() {
+        backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        contentView.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        titleLabel.textColor = AppTheme.colorForStyle(.primaryText01)
+        artistLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        albumLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        artView.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
     }
 }

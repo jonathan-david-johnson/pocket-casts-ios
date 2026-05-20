@@ -8,7 +8,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         iv.contentMode = .scaleAspectFit
         iv.layer.cornerRadius = 12
         iv.clipsToBounds = true
-        iv.backgroundColor = .secondarySystemBackground
+        iv.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -24,7 +24,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private let bitrateLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 13)
-        l.textColor = .secondaryLabel
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
         l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -43,7 +43,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private let nowPlayingArtistLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 15)
-        l.textColor = .secondaryLabel
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
         l.textAlignment = .center
         l.numberOfLines = 1
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -106,7 +106,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = station.displayableTitle()
-        view.backgroundColor = .systemBackground
+        applyTheme()
         setupLayout()
         updatePlayButton()
 
@@ -114,8 +114,9 @@ class StationDetailViewController: SimpleNotificationsViewController {
             logoView.image = image
         } else {
             logoView.image = UIImage(systemName: "radio")
-            logoView.tintColor = .secondaryLabel
+            logoView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
         nameLabel.text = station.displayableTitle()
 
         if let bitrate = station.bitrate {
@@ -151,6 +152,10 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // Reapply theme — user may have changed theme in Settings while this
+        // VC was off-screen; the persistent themeChanged observer covers the
+        // on-screen case.
+        themeDidChange()
         if station.tracklistUrl != nil {
             Task { await refetchTracklist() }
         }
@@ -173,6 +178,22 @@ class StationDetailViewController: SimpleNotificationsViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         removeAllCustomObservers()
+    }
+
+    @objc private func themeDidChange() {
+        applyTheme()
+        logoView.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
+        bitrateLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        nowPlayingArtistLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        tracklistTable.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        tracklistTable.reloadData()
+    }
+
+    private func applyTheme() {
+        view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        tracklistTable.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        nameLabel.textColor = AppTheme.colorForStyle(.primaryText01)
+        nowPlayingTitleLabel.textColor = AppTheme.colorForStyle(.primaryText01)
     }
 
     private func setupLayout() {
