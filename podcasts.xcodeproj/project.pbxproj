@@ -356,6 +356,10 @@
 		4D11D8A0010000000000B00A /* WidgetSkipBackIntentExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F007 /* WidgetSkipBackIntentExtension.swift */; };
 		4D11D8A0010000000000B00B /* WidgetSkipForwardIntentExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F008 /* WidgetSkipForwardIntentExtension.swift */; };
 		4D11D8A0010000000000B00C /* WidgetMuteToggleIntentExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F009 /* WidgetMuteToggleIntentExtension.swift */; };
+		4D11D8A0010000000000B00D /* PlayRadioStationIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F00A /* PlayRadioStationIntent.swift */; };
+		4D11D8A0010000000000B00E /* PlayRadioStationIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F00A /* PlayRadioStationIntent.swift */; };
+		4D11D8A0010000000000B00F /* AppPlayRadioStationIntentExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F00B /* AppPlayRadioStationIntentExtension.swift */; };
+		4D11D8A0010000000000B010 /* WidgetPlayRadioStationIntentExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D8A0010000000000F00C /* WidgetPlayRadioStationIntentExtension.swift */; };
 		4D7201012FAFB7780051B62B /* TrackArtworkResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D7201022FAFB7780051B62B /* TrackArtworkResolver.swift */; };
 		81C8677C17743B85BF586B0B /* VoiceBoostN.c in Sources */ = {isa = PBXBuildFile; fileRef = 14DD11DB5830A48ACE6928B2 /* VoiceBoostN.c */; };
 		8B0845932A66C86C00742C2F /* Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 2F90990B2A4F88B00044FC55 /* Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -1980,6 +1984,9 @@
 		4D11D8A0010000000000F007 /* WidgetSkipBackIntentExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSkipBackIntentExtension.swift; sourceTree = "<group>"; };
 		4D11D8A0010000000000F008 /* WidgetSkipForwardIntentExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSkipForwardIntentExtension.swift; sourceTree = "<group>"; };
 		4D11D8A0010000000000F009 /* WidgetMuteToggleIntentExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetMuteToggleIntentExtension.swift; sourceTree = "<group>"; };
+		4D11D8A0010000000000F00A /* PlayRadioStationIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayRadioStationIntent.swift; sourceTree = "<group>"; };
+		4D11D8A0010000000000F00B /* AppPlayRadioStationIntentExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPlayRadioStationIntentExtension.swift; sourceTree = "<group>"; };
+		4D11D8A0010000000000F00C /* WidgetPlayRadioStationIntentExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPlayRadioStationIntentExtension.swift; sourceTree = "<group>"; };
 		4D7201022FAFB7780051B62B /* TrackArtworkResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackArtworkResolver.swift; sourceTree = "<group>"; };
 		871975870906424F8C3C70B0 /* Modules */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Modules; sourceTree = SOURCE_ROOT; };
 		8B087FC829DC976F0027EAE5 /* PodcastImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastImage.swift; sourceTree = "<group>"; };
@@ -3965,6 +3972,9 @@
 				4D11D8A0010000000000F007 /* WidgetSkipBackIntentExtension.swift */,
 				4D11D8A0010000000000F008 /* WidgetSkipForwardIntentExtension.swift */,
 				4D11D8A0010000000000F009 /* WidgetMuteToggleIntentExtension.swift */,
+				4D11D8A0010000000000F00A /* PlayRadioStationIntent.swift */,
+				4D11D8A0010000000000F00B /* AppPlayRadioStationIntentExtension.swift */,
+				4D11D8A0010000000000F00C /* WidgetPlayRadioStationIntentExtension.swift */,
 			);
 			name = "Shared with Extension";
 			sourceTree = "<group>";
@@ -6995,6 +7005,8 @@
 				4D11D8A0010000000000B00A /* WidgetSkipBackIntentExtension.swift in Sources */,
 				4D11D8A0010000000000B00B /* WidgetSkipForwardIntentExtension.swift in Sources */,
 				4D11D8A0010000000000B00C /* WidgetMuteToggleIntentExtension.swift in Sources */,
+				4D11D8A0010000000000B00E /* PlayRadioStationIntent.swift in Sources */,
+				4D11D8A0010000000000B010 /* WidgetPlayRadioStationIntentExtension.swift in Sources */,
 				463538F526F2415300BA9D35 /* Strings+L10n.swift in Sources */,
 				4036B09325240CD100AE08E6 /* CommonUpNextItem.swift in Sources */,
 			);
@@ -7087,6 +7099,8 @@
 				4D11D8A0010000000000B007 /* AppSkipBackIntentExtension.swift in Sources */,
 				4D11D8A0010000000000B008 /* AppSkipForwardIntentExtension.swift in Sources */,
 				4D11D8A0010000000000B009 /* AppMuteToggleIntentExtension.swift in Sources */,
+				4D11D8A0010000000000B00D /* PlayRadioStationIntent.swift in Sources */,
+				4D11D8A0010000000000B00F /* AppPlayRadioStationIntentExtension.swift in Sources */,
 				BD9FF6121B8EC90C009F075E /* ImageManager.swift in Sources */,
 				BD6B432C27561EA8005E4017 /* PCHostingController.swift in Sources */,
 				BDCA84F21C1FB7260022ED4D /* DownloadSettingsViewController.swift in Sources */,

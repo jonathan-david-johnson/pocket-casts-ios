@@ -169,10 +169,26 @@ class PlaybackManager: ServerPlaybackDelegate {
 
         let episodeIsChanging = episode.uuid != currentEpisode()?.uuid
 
-        // if the user has built an Up Next list, preserve that but make this the currently playing episode
-        if !overrideUpNext && !switchingToDifferentUpNextEpisode && queue.upNextCount() > 0 {
+        // Preserve the outgoing item by moving it to Up Next whenever the
+        // episode is actually changing. Upstream Pocket Casts gated this on
+        // `queue.upNextCount() > 0` — but that count excludes the current
+        // slot, so a single-podcast listening session reads as `0` and the
+        // outgoing podcast gets silently dropped by `overrideAllEpisodesWith`
+        // (which `remove()`s the previous playlist-episode under
+        // `avoidReplaceOnEpisodeSwap`). Always going through `switchTo`
+        // preserves the previous item regardless of queue length.
+        if !overrideUpNext && !switchingToDifferentUpNextEpisode {
             if let currEpisode = currentEpisode(), currEpisode.uuid != episode.uuid {
-                switchTo(episodeToPlay: episode, moveExistingToUpNext: true, autoPlay: true, completion: completion)
+                // Don't push a `RadioStation` into Up Next when switching off it.
+                // Radio sessions are ephemeral — they should never accumulate
+                // in the queue. When the outgoing item is a registered radio
+                // station, drop it instead of moving it to Up Next.
+                #if !os(watchOS) && !APPCLIP && !os(tvOS)
+                let currentIsRadio = RadioStationRegistry.shared.station(for: currEpisode.uuid) != nil
+                #else
+                let currentIsRadio = false
+                #endif
+                switchTo(episodeToPlay: episode, moveExistingToUpNext: !currentIsRadio, autoPlay: true, completion: completion)
 
                 return
             }
@@ -188,7 +204,14 @@ class PlaybackManager: ServerPlaybackDelegate {
 
         // pressing play/pause when using the Effects Player will cause the code to go through here again, but we only need to mess with the Up Next if we're not playing the same episode anymore
         if episodeIsChanging {
-            if overrideUpNext || queue.upNextCount() == 0 {
+            // Upstream gated `pushNewCurrentlyPlaying` on `upNextCount() > 0`,
+            // but that count excludes the currently-playing slot — so a
+            // single-podcast session (or post-`remove()` radio swap) reads as
+            // 0 and the outgoing item is wiped by `overrideAllEpisodesWith`.
+            // Override only when explicitly asked, or when nothing is playing
+            // at all; otherwise always push so the outgoing item gets shifted
+            // down to Up Next position 1.
+            if overrideUpNext || currentEpisode() == nil {
                 queue.overrideAllEpisodesWith(episode: episode)
             } else {
                 queue.pushNewCurrentlyPlaying(episode: episode)
@@ -368,6 +391,29 @@ class PlaybackManager: ServerPlaybackDelegate {
         let target = episode ?? currentEpisode()
         guard let uuid = target?.uuid else { return nil }
         return RadioStationRegistry.shared.station(for: uuid)
+    }
+
+    /// Strip every `RadioStation` shim from the up-next portion of the queue
+    /// (positions 1+). Position 0 — the currently-playing item — is left
+    /// alone, because that may legitimately be a radio station mid-playback.
+    /// Called once at launch to drain stale state that accumulated before
+    /// `load()` started rejecting radio-into-up-next moves.
+    ///
+    /// A queue entry is considered radio if its uuid matches either:
+    ///   - a station the in-memory `RadioStationRegistry` already knows about
+    ///     (this session), OR
+    ///   - a curated `radioBrowserUUIDs` entry in `curated_stations.json`
+    ///     (handles stale shims persisted in SQLite across launches, before
+    ///     the registry has been populated).
+    /// Supabase-only favourites are excluded for the MVP (async lookup); the
+    /// curated set covers KCRW/KEXP/NPR which is where the problem surfaces.
+    func clearStaleRadioFromUpNext() {
+        let curatedUUIDs = Set(CuratedStationsLoader.enhancementsByUUID.keys)
+        let episodes = queue.allEpisodes(includeNowPlaying: false)
+        for episode in episodes where curatedUUIDs.contains(episode.uuid) || RadioStationRegistry.shared.station(for: episode.uuid) != nil {
+            queue.remove(episode: episode, fireNotification: false)
+        }
+        NotificationCenter.postOnMainThread(notification: Constants.Notifications.upNextQueueChanged)
     }
     #endif
 

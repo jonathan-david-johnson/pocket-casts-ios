@@ -41,6 +41,25 @@ struct PocketRadioProvider: TimelineProvider {
 
         let favorites = Self.loadFavorites(defaults: defaults)
 
+        // "Last podcast" tile (bottom row slot 1):
+        // - When a podcast is playing, the first Up Next item IS that podcast.
+        // - When live radio is playing, the radio shim *may or may not* survive
+        //   `publishUpNextInfo` — `DataManager.findBaseEpisode` returns nil for
+        //   the shim, in which case the radio is silently dropped from the
+        //   published `upNextItems` JSON. We can't rely on a fixed offset, so
+        //   pick the first entry whose uuid isn't the currently-playing
+        //   station id.
+        let upNext = widgetData.upNextEpisodes ?? []
+        let lastPodcast: WidgetEpisode? = {
+            if isLive {
+                let activeStationId = liveTrack?.stationId
+                let candidate = upNext.first(where: { $0.episodeUuid != activeStationId })
+                candidate?.loadImageData()
+                return candidate
+            }
+            return nowPlaying
+        }()
+
         return PocketRadioEntry(
             date: Date(),
             nowPlaying: nowPlaying,
@@ -48,7 +67,8 @@ struct PocketRadioProvider: TimelineProvider {
             liveTrack: liveTrack,
             isPlaying: widgetData.isPlaying,
             isMuted: isMuted,
-            favorites: favorites
+            favorites: favorites,
+            lastPodcast: lastPodcast
         )
     }
 

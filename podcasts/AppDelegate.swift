@@ -110,6 +110,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
             ImageManager.sharedManager.updatePodcastImagesIfRequired()
             WidgetHelper.shared.cleanupAppGroupImages()
+            #if !APPCLIP
+            // Drain stale radio shims from Up Next that pre-date the
+            // M8-era load() change rejecting radio-into-up-next moves.
+            PlaybackManager.shared.clearStaleRadioFromUpNext()
+            #endif
             SiriShortcutsManager.shared.setup()
 
             DownloadManager.shared.startAllQueued()

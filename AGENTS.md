@@ -2,9 +2,9 @@
 
 This is **PocketRadio**, a personal fork of `Automattic/pocket-casts-ios` maintained by Jonathan David Johnson. The fork adds internet radio streaming (radio-browser.info) and other "spoken / streamed audio" features on top of the upstream podcast app. See `README.md` for the human-facing summary.
 
-Milestone planning documents live at `../docs/current_milestone.md` and `../docs/milestones/milestone_N.md`. Always check `../docs/current_milestone.md` when picking up work — it is the source of truth for the active task.
+Milestone planning documents live at `../docs/ios/current_milestone.md` and `../docs/ios/milestones/milestone_N.md`. Always check `../docs/ios/current_milestone.md` when picking up work — it is the source of truth for the active task.
 
-**Symlink convention:** `../docs/current_milestone.md` is always a symlink to the active milestone file (e.g. `milestones/milestone_5.1.md`). To start a new milestone, create `milestones/milestone_N.M.md` and repoint the symlink — do NOT write the new plan through `current_milestone.md`, that overwrites the previous milestone's archive. Use `/new-milestone <N>` to do this safely. Same trap exists in this repo: `CLAUDE.md` is a symlink to `AGENTS.md`; edits to `CLAUDE.md` land in `AGENTS.md`, and `git add CLAUDE.md` is a no-op.
+**Symlink convention:** `../docs/ios/current_milestone.md` is always a symlink to the active milestone file (e.g. `milestones/milestone_8.md`). To start a new milestone, create `milestones/milestone_N.M.md` and repoint the symlink — do NOT write the new plan through `current_milestone.md`, that overwrites the previous milestone's archive. Use `/new-milestone <N>` to do this safely. Same trap exists in this repo: `CLAUDE.md` is a symlink to `AGENTS.md`; edits to `CLAUDE.md` land in `AGENTS.md`, and `git add CLAUDE.md` is a no-op.
 
 ## Simulator and bundle reference
 
@@ -203,6 +203,39 @@ Include the flag key and gating condition explicitly in the milestone plan — d
 After adding new Swift files or editing across module boundaries, SourceKit (the IDE language service) may emit transient "No such module 'UIKit'", "No such module 'XCTest'", or "No such module 'PocketCastsDataModel'" errors. These are **stale-index artifacts**, not real build failures.
 
 **Always trust the result of `make build_staging` / `make test_staging` over a SourceKit-only diagnostic.** Re-running the build typically refreshes the index. Do not chase imports based on these warnings alone.
+
+## Widget extension bundle isolation
+
+The `WidgetExtension/` target has its own bundle and its own asset catalog at `WidgetExtension/Assets.xcassets`. Code in the widget extension **cannot** read images from `podcasts/CommonImages.xcassets` (or any other catalog in the main app's bundle) via `UIImage(named:)` — those resources don't exist in the widget binary.
+
+When a widget needs a bundled image used elsewhere in the app (e.g. a curated station logo), copy the imageset into `WidgetExtension/Assets.xcassets`. The catalog is auto-included in the widget target.
+
+## App Group ID — single source of truth
+
+The shared App Group ID must match across:
+- `podcasts/SharedConstants.swift` → `SharedConstants.GroupUserDefaults.groupContainerId`
+- `podcasts/WidgetHelper.swift` → `WidgetHelper.appGroupId`
+- `WidgetExtension/Common/CommonWidgetHelper.swift` → `CommonWidgetHelper.appGroupId`
+- every `*.entitlements` file (`podcasts/`, `WidgetExtension/`, `Share Extension/`, etc.)
+
+The PocketRadio fork value is `group.com.jdj.pocketradio`. Read from the `SharedConstants` constant; never hardcode the literal in helper files. A mismatch silently breaks every widget — `UserDefaults(suiteName:)` returns a defaults object that reads nil and writes no-ops, with no error surfaced.
+
+## Interactive widget intents — explicit widget refresh
+
+`AudioPlaybackIntent.perform()` (e.g. `PlayEpisodeIntent`, `PlayRadioStationIntent`) runs in the main app process when invoked from a widget tap, but the `NotificationCenter` observers in `WidgetHelper` can fire too late for `WidgetCenter`'s next timeline sample. Result: the widget face shows stale state for several seconds.
+
+Always end the intent's `perform()` body with `WidgetHelper.shared.republishAllPocketRadioState()` (or the equivalent for the widget kind). This forces a fresh App Group write + `reloadAllTimelines()` before the closure returns.
+
+## PlaybackManager.load() — outgoing item preservation
+
+Upstream Pocket Casts gates the "push outgoing to Up Next" path on `queue.upNextCount() > 0`. That count excludes the currently-playing slot, so a single-podcast session (or any post-`switchTo` path where the radio shim was just removed) reads as `0`, and `overrideAllEpisodesWith(episode:)` then calls `queue.remove(episode: previousEpisode, ...)` under `FeatureFlag.avoidReplaceOnEpisodeSwap`. The outgoing item is dropped from the queue entirely — to the user this looks like the previous podcast was "marked played" rather than pushed down.
+
+PocketRadio patches `PlaybackManager.load(...)` so:
+- The outer guard goes through `switchTo(...)` whenever the episode is changing (no `upNextCount() > 0` requirement).
+- The branch decision uses `pushNewCurrentlyPlaying` whenever `currentEpisode() != nil` (override only when explicitly requested or when nothing is playing).
+- When the outgoing episode is a `RadioStation`, `switchTo` is called with `moveExistingToUpNext: false` so radio shims never accumulate in Up Next.
+
+If you change `load()`, preserve all three behaviors.
 
 ## Protocol Buffers
 

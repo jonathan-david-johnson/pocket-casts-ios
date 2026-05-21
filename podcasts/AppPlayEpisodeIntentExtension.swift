@@ -24,5 +24,10 @@ extension PlayEpisodeIntent {
             PlaybackManager.shared.load(episode: podcastEpisode, autoPlay: true, overrideUpNext: false)
             Analytics.track(.widgetInteraction, properties: ["action": "play"])
         }
+
+        // Force the Pocket Radio widget face to repaint so the bottom-row
+        // "last podcast" tile and top-row title/artist reflect the swap
+        // before WidgetCenter samples the next timeline.
+        WidgetHelper.shared.republishAllPocketRadioState()
     }
 }

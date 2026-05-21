@@ -60,7 +60,11 @@ struct PocketRadioEntryView: View {
 
     @ViewBuilder
     private var artworkView: some View {
-        if let data = entry.nowPlaying?.imageData, let image = UIImage(data: data) {
+        if entry.isLive, let assetName = entry.liveTrack?.logoAssetName, let image = UIImage(named: assetName) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else if !entry.isLive, let data = entry.nowPlaying?.imageData, let image = UIImage(data: data) {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
@@ -85,8 +89,12 @@ struct PocketRadioEntryView: View {
     }
 
     private var artistText: String {
-        if entry.isLive, let live = entry.liveTrack, !live.artist.isEmpty {
-            return live.artist
+        if entry.isLive {
+            // Live radio — show artist when ICY/tracklist has resolved one,
+            // otherwise empty. Do NOT fall through to `nowPlaying.podcastName`
+            // — that would bleed the previously-playing podcast's show name
+            // into the live row before the first metadata tick lands.
+            return entry.liveTrack?.artist ?? ""
         }
         return entry.nowPlaying?.podcastName ?? ""
     }
@@ -95,7 +103,7 @@ struct PocketRadioEntryView: View {
 
     private var bottomRow: some View {
         HStack(spacing: 8) {
-            NowPlayingTile(episode: entry.nowPlaying)
+            NowPlayingTile(episode: entry.lastPodcast)
             ForEach(Array(entry.favorites.enumerated()), id: \.offset) { _, station in
                 FavoriteTile(station: station)
             }
@@ -114,12 +122,26 @@ private struct NowPlayingTile: View {
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
 
-        if let episode, let url = URL(string: "pktc://widget-episode/\(episode.episodeUuid)") {
-            Link(destination: url) { tile }
+        if let episode {
+            // Tap plays the episode in-place via `PlayEpisodeIntent`. iOS 17+.
+            if #available(iOS 17, *) {
+                Button(intent: PlayEpisodeIntent(episodeUuid: episode.episodeUuid)) {
+                    tile
+                }
+                .buttonStyle(.plain)
                 .accessibilityLabel(episode.episodeTitle)
-        } else if let url = URL(string: "pktc://last_opened") {
+            } else if let url = URL(string: "pktc://widget-episode/\(episode.episodeUuid)") {
+                // Pre-iOS-17 fallback: deep-link to the episode page since
+                // interactive intents aren't available.
+                Link(destination: url) { tile }
+                    .accessibilityLabel(episode.episodeTitle)
+            } else {
+                tile
+            }
+        } else if let url = URL(string: "pktc://podcasts?source=widget") {
+            // Empty slot — link to the Podcasts tab so the user can pick one.
             Link(destination: url) { tile }
-                .accessibilityLabel("Open player")
+                .accessibilityLabel("Podcasts")
         } else {
             tile
         }
@@ -137,7 +159,7 @@ private struct NowPlayingTile: View {
                     .aspectRatio(contentMode: .fill)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             } else {
-                Image(systemName: "play.fill")
+                Image(systemName: "headphones")
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
@@ -160,11 +182,21 @@ private struct FavoriteTile: View {
             } else {
                 tile
             }
-        } else if let url = URL(string: "pktc://station/\(station.stationId)?source=widget") {
-            Link(destination: url) { tile }
-                .accessibilityLabel(station.name)
         } else {
-            tile
+            // Tap plays the station in-place via `PlayRadioStationIntent`.
+            // Pre-iOS-17 falls back to deep-link to Station Detail.
+            if #available(iOS 17, *) {
+                Button(intent: PlayRadioStationIntent(stationId: station.stationId)) {
+                    tile
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(station.name)
+            } else if let url = URL(string: "pktc://station/\(station.stationId)?source=widget") {
+                Link(destination: url) { tile }
+                    .accessibilityLabel(station.name)
+            } else {
+                tile
+            }
         }
     }
 

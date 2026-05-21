@@ -285,6 +285,20 @@ extension AppDelegate {
             return true
         }
 
+        // Pocket Radio widget — open the Podcasts tab. Used by the bottom-row
+        // "last podcast" tile placeholder when the user has no recent podcast
+        // to surface (e.g. fresh install, or only radio in the queue).
+        // `pktc://podcasts?source=widget`
+        JLRoutes.global().addRoute("/podcasts") { parameters -> Bool in
+            if let source = parameters["source"] as? String, source == "widget" {
+                Analytics.track(.pocketRadioWidgetInteraction, properties: ["action": "podcasts"])
+            }
+            if let main = SceneHelper.connectedScene()?.windows.first(where: { $0.rootViewController is MainTabBarController })?.rootViewController as? MainTabBarController {
+                main.navigateToPodcastList(true)
+            }
+            return true
+        }
+
         // Pocket Radio widget — open the Streams tab to the Favorites segment.
         // `pktc://favorites?source=widget`
         JLRoutes.global().addRoute("/favorites") { parameters -> Bool in

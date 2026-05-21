@@ -282,6 +282,10 @@ class WidgetHelper {
         let title: String
         let artist: String
         let albumArtURL: String?
+        /// Curated station logo asset name so the widget can show the station
+        /// brand mark even when the track has no album art (or before the
+        /// widget process can fetch a remote URL — widgets render sync).
+        let logoAssetName: String?
     }
 
     /// Re-loads the top-3 favorites and writes a JSON snapshot to the App Group.
@@ -322,10 +326,17 @@ class WidgetHelper {
         }
     }
 
-    /// Mirrors `PlaybackManager.shared.shouldUseMuteControls()` into the App Group.
+    /// Mirrors "is the current item a curated radio station" into the App
+    /// Group. Uses `liveStation(for:)` (any registered `RadioStation`) rather
+    /// than `shouldUseMuteControls()` (which excludes finite-duration streams
+    /// like NPR Hourly so the in-app player can keep skip controls). For the
+    /// widget, anything that lives under Streams is "a stream" — the user
+    /// wants mute + tracklist controls regardless of whether the underlying
+    /// audio is seekable.
     func publishPocketRadioLiveFlag() {
         guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
-        sharedDefaults.set(PlaybackManager.shared.shouldUseMuteControls(), forKey: SharedConstants.GroupUserDefaults.pocketRadioIsLiveStream)
+        let isStream = PlaybackManager.shared.liveStation(for: nil) != nil
+        sharedDefaults.set(isStream, forKey: SharedConstants.GroupUserDefaults.pocketRadioIsLiveStream)
     }
 
     /// Mirrors `PlaybackManager.shared.isMuted` into the App Group.
@@ -334,23 +345,32 @@ class WidgetHelper {
         sharedDefaults.set(PlaybackManager.shared.isMuted, forKey: SharedConstants.GroupUserDefaults.pocketRadioIsMuted)
     }
 
-    /// Mirrors the current live-track resolve entry (from `TrackArtworkResolver`)
-    /// into the App Group. Clears the key if there's nothing playing live or
-    /// no resolvable track yet.
+    /// Mirrors the current live-stream state into the App Group. While a
+    /// station is playing, the snapshot ALWAYS has at minimum the station
+    /// name + logo asset name, so the widget never falls through to the
+    /// previous podcast's title/art before the first ICY frame lands. If
+    /// `TrackArtworkResolver` has a `(artist, title)` it overrides the
+    /// station-name placeholder. Clears the key when nothing live is playing.
     func publishPocketRadioLiveTrack() {
         guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
-        guard PlaybackManager.shared.shouldUseMuteControls(),
-              let stationId = PlaybackManager.shared.currentEpisode()?.uuid,
-              let entry = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: "", icyTitle: "")
-        else {
+        // Match `publishPocketRadioLiveFlag` — any curated `RadioStation`
+        // counts, including finite-MP3 streams like NPR Hourly.
+        guard let station = PlaybackManager.shared.liveStation(for: nil) else {
             sharedDefaults.removeObject(forKey: SharedConstants.GroupUserDefaults.pocketRadioLiveTrack)
             return
         }
+        let stationId = station.uuid
+
+        let enhancement = CuratedStationsLoader.enhancementsByUUID[stationId]
+        let stationName = PlaybackManager.shared.liveStation(for: nil)?.displayableTitle() ?? enhancement?.name ?? ""
+        let resolved = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: "", icyTitle: "")
+
         let snapshot = PocketRadioLiveTrackSnapshot(
             stationId: stationId,
-            title: entry.title,
-            artist: entry.artist,
-            albumArtURL: entry.albumArtURL?.absoluteString
+            title: resolved?.title ?? stationName,
+            artist: resolved?.artist ?? "",
+            albumArtURL: resolved?.albumArtURL?.absoluteString,
+            logoAssetName: enhancement?.logoAsset
         )
         do {
             let data = try JSONEncoder().encode(snapshot)
