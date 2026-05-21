@@ -2,11 +2,16 @@
 import PocketCastsDataModel
 import PocketCastsServer
 import PocketCastsUtils
+import UIKit
 import WidgetKit
 
 class WidgetHelper {
     static let shared = WidgetHelper()
-    static let appGroupId = "group.au.com.shiftyjelly.pocketcasts"
+    // Mirror of `SharedConstants.GroupUserDefaults.groupContainerId`. Kept as
+    // a `static let` so existing call sites that read `WidgetHelper.appGroupId`
+    // stay in sync with the suite name. Must match the value declared in the
+    // entitlements files.
+    static let appGroupId = SharedConstants.GroupUserDefaults.groupContainerId
     static let maxUpNextToPublish = 10
     static let maxFilterToPublish = 5
     init() {
@@ -19,6 +24,35 @@ class WidgetHelper {
         NotificationCenter.default.addObserver(self, selector: #selector(updateFromNotification), name: Constants.Notifications.upNextEpisodeRemoved, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleFilterChanged), name: Constants.Notifications.playlistChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleFilterChanged), name: Constants.Notifications.podcastAdded, object: nil)
+
+        // Pocket Radio widget mirrored state (M8). Re-publish when any of the
+        // inputs change: favorites list, mute state, live-stream track info,
+        // and the same playback start/pause/track-change set the Up Next
+        // mirror already listens on (handled in `updateFromNotification`).
+        NotificationCenter.default.addObserver(self, selector: #selector(updatePocketRadioFromNotification), name: .radioFavoritesChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(updatePocketRadioFromNotification), name: Constants.Notifications.playbackMuteChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(updatePocketRadioFromNotification), name: .radioStationNowPlayingDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(updatePocketRadioFromNotification), name: .radioTracklistDidRefresh, object: nil)
+
+        // Initial publish: the App Group keys are otherwise only written on
+        // change-notifications. If the app launches with state already in
+        // place (e.g. an episode loaded but not playing) and no notification
+        // fires, the widget reads stale/empty values. Publish once after a
+        // short delay so `PlaybackManager` / `RadioFavoritesManager` have
+        // settled.
+        NotificationCenter.default.addObserver(self, selector: #selector(republishAllPocketRadioState), name: UIApplication.willEnterForegroundNotification, object: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.republishAllPocketRadioState()
+        }
+    }
+
+    @objc func republishAllPocketRadioState() {
+        updateSharedUpNext()
+        publishPocketRadioFavorites()
+        publishPocketRadioLiveFlag()
+        publishPocketRadioLiveTrack()
+        publishPocketRadioMute()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     deinit {
@@ -35,12 +69,27 @@ class WidgetHelper {
             if widgets.contains(where: { $0.kind == "Up_Next_Widget" }), PlaybackManager.shared.currentEpisode() == nil, PlaybackManager.shared.queue.upNextCount() == 0 {
                 self.publishTopFilterInfo()
             }
+            if widgets.contains(where: { $0.kind == "PocketRadio_Widget" }) {
+                // Reload triggered below via reloadAllTimelines; data was
+                // already mirrored by `updateFromNotification`.
+            }
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
     @objc func updateFromNotification() {
         updateSharedUpNext()
+        publishPocketRadioLiveFlag()
+        publishPocketRadioLiveTrack()
+        publishPocketRadioMute()
+    }
+
+    @objc func updatePocketRadioFromNotification() {
+        publishPocketRadioFavorites()
+        publishPocketRadioLiveFlag()
+        publishPocketRadioLiveTrack()
+        publishPocketRadioMute()
+        WidgetCenter.shared.reloadTimelines(ofKind: "PocketRadio_Widget")
     }
 
     func updateSharedUpNext() {
@@ -214,6 +263,101 @@ class WidgetHelper {
             FileLog.shared.addMessage("Failed to copy custom file image to app group \(error.localizedDescription)")
         }
         return ""
+    }
+
+    // MARK: - Pocket Radio Widget (M8)
+
+    /// Snapshot row mirrored to the App Group for the Pocket Radio widget.
+    /// Stays intentionally small — image bytes are NOT inlined here. Phase 2
+    /// will add per-station JPEG caching under `widget_images/station_<id>.jpg`.
+    private struct PocketRadioFavoriteSnapshot: Codable {
+        let stationId: String
+        let name: String
+        let logoAssetName: String?
+        let faviconUrl: String?
+    }
+
+    private struct PocketRadioLiveTrackSnapshot: Codable {
+        let stationId: String
+        let title: String
+        let artist: String
+        let albumArtURL: String?
+    }
+
+    /// Re-loads the top-3 favorites and writes a JSON snapshot to the App Group.
+    /// Async because Supabase is the source of truth; falls back to clearing
+    /// the key on error so the widget renders the "Add favorites" placeholder
+    /// rather than stale data.
+    func publishPocketRadioFavorites() {
+        Task { [weak self] in
+            guard let self else { return }
+            let favorites: [FavoriteStation]
+            do {
+                favorites = try await RadioFavoritesManager.shared.loadFavorites()
+            } catch {
+                FileLog.shared.addMessage("PocketRadioWidget favorites publish failed: \(error.localizedDescription)")
+                self.writePocketRadioFavoritesSnapshot([])
+                return
+            }
+            let top = favorites.prefix(3).map { row -> PocketRadioFavoriteSnapshot in
+                let enhancement = CuratedStationsLoader.enhancementsByUUID[row.station_id]
+                return PocketRadioFavoriteSnapshot(
+                    stationId: row.station_id,
+                    name: enhancement?.name ?? row.station_id,
+                    logoAssetName: enhancement?.logoAsset,
+                    faviconUrl: nil
+                )
+            }
+            self.writePocketRadioFavoritesSnapshot(top)
+        }
+    }
+
+    private func writePocketRadioFavoritesSnapshot(_ snapshot: [PocketRadioFavoriteSnapshot]) {
+        guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
+        do {
+            let data = try JSONEncoder().encode(snapshot)
+            sharedDefaults.set(data, forKey: SharedConstants.GroupUserDefaults.pocketRadioFavorites)
+        } catch {
+            FileLog.shared.addMessage("PocketRadioWidget favorites encode failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Mirrors `PlaybackManager.shared.shouldUseMuteControls()` into the App Group.
+    func publishPocketRadioLiveFlag() {
+        guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
+        sharedDefaults.set(PlaybackManager.shared.shouldUseMuteControls(), forKey: SharedConstants.GroupUserDefaults.pocketRadioIsLiveStream)
+    }
+
+    /// Mirrors `PlaybackManager.shared.isMuted` into the App Group.
+    func publishPocketRadioMute() {
+        guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
+        sharedDefaults.set(PlaybackManager.shared.isMuted, forKey: SharedConstants.GroupUserDefaults.pocketRadioIsMuted)
+    }
+
+    /// Mirrors the current live-track resolve entry (from `TrackArtworkResolver`)
+    /// into the App Group. Clears the key if there's nothing playing live or
+    /// no resolvable track yet.
+    func publishPocketRadioLiveTrack() {
+        guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
+        guard PlaybackManager.shared.shouldUseMuteControls(),
+              let stationId = PlaybackManager.shared.currentEpisode()?.uuid,
+              let entry = TrackArtworkResolver.bestResolveEntry(stationId: stationId, icyArtist: "", icyTitle: "")
+        else {
+            sharedDefaults.removeObject(forKey: SharedConstants.GroupUserDefaults.pocketRadioLiveTrack)
+            return
+        }
+        let snapshot = PocketRadioLiveTrackSnapshot(
+            stationId: stationId,
+            title: entry.title,
+            artist: entry.artist,
+            albumArtURL: entry.albumArtURL?.absoluteString
+        )
+        do {
+            let data = try JSONEncoder().encode(snapshot)
+            sharedDefaults.set(data, forKey: SharedConstants.GroupUserDefaults.pocketRadioLiveTrack)
+        } catch {
+            FileLog.shared.addMessage("PocketRadioWidget live track encode failed: \(error.localizedDescription)")
+        }
     }
 
     func cleanupAppGroupImages() {

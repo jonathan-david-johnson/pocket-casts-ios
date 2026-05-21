@@ -347,6 +347,30 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         }
     }
 
+    /// Switch to the Streams tab and select the Favorites segment of
+    /// `StreamsHostViewController`. Used by the Pocket Radio widget's
+    /// `pktc://favorites` deep link.
+    func navigateToStreamsFavorites(animated: Bool) {
+        guard switchToTab(.streams) else { return }
+        if let navController = selectedViewController as? UINavigationController {
+            navController.popToRootViewController(animated: animated)
+            if let host = navController.viewControllers.first as? StreamsHostViewController {
+                host.selectFavorites()
+            }
+        }
+    }
+
+    /// Switch to the Streams tab and push a `StationDetailViewController`
+    /// for the given station onto its nav stack. Used by the Pocket Radio
+    /// widget's `pktc://station/<id>` deep link.
+    func navigateToStreamsStation(_ station: RadioStation, animated: Bool) {
+        guard switchToTab(.streams) else { return }
+        guard let navController = selectedViewController as? UINavigationController else { return }
+        navController.popToRootViewController(animated: false)
+        let detail = StationDetailViewController(station: station)
+        navController.pushViewController(detail, animated: animated)
+    }
+
     func navigateToFolder(_ folder: Folder, popToRootViewController: Bool = true) {
         guard let navController = selectedViewController as? UINavigationController else { return }
 

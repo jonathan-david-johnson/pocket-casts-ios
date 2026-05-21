@@ -7,6 +7,13 @@ struct FavoriteStation: Codable {
     let added_at: String
 }
 
+extension Notification.Name {
+    /// Posted whenever the user's radio favorites list changes (added,
+    /// removed, or reordered locally). Consumers like `WidgetHelper` use this
+    /// to republish the App Group snapshot for the Pocket Radio widget.
+    static let radioFavoritesChanged = Notification.Name("radioFavoritesChanged")
+}
+
 class RadioFavoritesManager {
     static let shared = RadioFavoritesManager()
 
@@ -63,6 +70,7 @@ class RadioFavoritesManager {
     func setOrder(_ stationIds: [String]) {
         guard let userId = ServerSettings.userId else { return }
         saveOrder(stationIds, userId: userId)
+        NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
     }
 
     func addFavorite(stationId: String) async throws {
@@ -80,6 +88,7 @@ class RadioFavoritesManager {
             order.insert(stationId, at: 0)
             saveOrder(order, userId: userId)
         }
+        NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
     }
 
     func removeFavorite(stationId: String) async throws {
@@ -95,6 +104,7 @@ class RadioFavoritesManager {
             order.remove(at: idx)
             saveOrder(order, userId: userId)
         }
+        NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
     }
 
     func isFavorite(stationId: String) async throws -> Bool {

@@ -6066,3 +6066,15 @@
 
 /* tv up next empty button action title */
 "tv_up_next_empty_action_title" = "Add episodes";
+
+/* Pocket Radio widget — placeholder text shown when a favorites tile has no station assigned, prompting the user to add favorites */
+"pocket_radio_widget_add_favorites" = "Add favorites";
+
+/* Pocket Radio widget — accessibility label for the tracklist shortcut button shown for live radio streams */
+"pocket_radio_widget_tracklist_a11y" = "Open tracklist";
+
+/* Pocket Radio widget — accessibility label for the mute button when audio is currently playing */
+"pocket_radio_widget_mute_a11y" = "Mute";
+
+/* Pocket Radio widget — accessibility label for the mute button when audio is currently muted */
+"pocket_radio_widget_unmute_a11y" = "Unmute";

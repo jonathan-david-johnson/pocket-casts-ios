@@ -258,6 +258,45 @@ extension AppDelegate {
             return true
         }
 
+        // Pocket Radio widget — open a specific station's detail screen.
+        // `pktc://station/<stationId>?source=widget`
+        JLRoutes.global().addRoute("/station/*") { parameters -> Bool in
+            guard let pathComponents = parameters[JLRouteWildcardComponentsKey] as? [String], let stationId = pathComponents[safe: 0] else { return false }
+
+            if let source = parameters["source"] as? String, source == "widget" {
+                Analytics.track(.pocketRadioWidgetInteraction, properties: ["action": "station"])
+            }
+
+            // Resolve the station via the same path Favorites uses — radio-browser
+            // by-UUID lookup, then layer curated enhancements via toRadioStation().
+            // Network call is best-effort; on failure, fall back to a stub
+            // RadioStation so the user still lands on the Streams tab.
+            Task { @MainActor in
+                let station: RadioStation
+                if let browse = try? await RadioBrowserAPI.station(uuid: stationId) {
+                    station = browse.toRadioStation()
+                } else {
+                    station = RadioStation(stationId: stationId, name: stationId, streamUrl: "")
+                }
+                if let main = SceneHelper.connectedScene()?.windows.first(where: { $0.rootViewController is MainTabBarController })?.rootViewController as? MainTabBarController {
+                    main.navigateToStreamsStation(station, animated: true)
+                }
+            }
+            return true
+        }
+
+        // Pocket Radio widget — open the Streams tab to the Favorites segment.
+        // `pktc://favorites?source=widget`
+        JLRoutes.global().addRoute("/favorites") { parameters -> Bool in
+            if let source = parameters["source"] as? String, source == "widget" {
+                Analytics.track(.pocketRadioWidgetInteraction, properties: ["action": "favorites"])
+            }
+            if let main = SceneHelper.connectedScene()?.windows.first(where: { $0.rootViewController is MainTabBarController })?.rootViewController as? MainTabBarController {
+                main.navigateToStreamsFavorites(animated: true)
+            }
+            return true
+        }
+
         JLRoutes.global().addRoute("/show_player") { [weak self] _ -> Bool in
             Analytics.track(.widgetInteraction, properties: ["action": "now_playing"])
             self?.openPlayerWhenReadyFromExternalEvent()

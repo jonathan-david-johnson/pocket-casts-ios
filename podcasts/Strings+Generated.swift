@@ -2795,6 +2795,14 @@ internal enum L10n {
   internal static var pocketCastsPlusShort: String { return L10n.tr("Localizable", "pocket_casts_plus_short", fallback: "Plus") }
   /// The heading shown for the Pocket Casts Newsletter
   internal static var pocketCastsWelcomeNewsletterTitle: String { return L10n.tr("Localizable", "pocket_casts_welcome_newsletter_title", fallback: "Get the Newsletter") }
+  /// Pocket Radio widget — placeholder text shown when a favorites tile has no station assigned, prompting the user to add favorites
+  internal static var pocketRadioWidgetAddFavorites: String { return L10n.tr("Localizable", "pocket_radio_widget_add_favorites", fallback: "Add favorites") }
+  /// Pocket Radio widget — accessibility label for the mute button when audio is currently playing
+  internal static var pocketRadioWidgetMuteA11y: String { return L10n.tr("Localizable", "pocket_radio_widget_mute_a11y", fallback: "Mute") }
+  /// Pocket Radio widget — accessibility label for the tracklist shortcut button shown for live radio streams
+  internal static var pocketRadioWidgetTracklistA11y: String { return L10n.tr("Localizable", "pocket_radio_widget_tracklist_a11y", fallback: "Open tracklist") }
+  /// Pocket Radio widget — accessibility label for the mute button when audio is currently muted
+  internal static var pocketRadioWidgetUnmuteA11y: String { return L10n.tr("Localizable", "pocket_radio_widget_unmute_a11y", fallback: "Unmute") }
   /// Indicates that the access to the podcast has ended on the specified date. '%1$@' is a placeholder for date that the access expired.
   internal static func podcastAccessEnded(_ p1: Any) -> String {
     return L10n.tr("Localizable", "podcast_access_ended", String(describing: p1), fallback: "Access ended: %1$@")
