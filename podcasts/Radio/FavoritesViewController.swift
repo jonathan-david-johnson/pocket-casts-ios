@@ -75,6 +75,13 @@ class FavoritesViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.rowHeight = 68
+        // Permanent edit mode shows the reorder handle on every row (mirrors
+        // UpNext's `upNextTable.isEditing = true` pattern). `editingStyle =
+        // .none` (see `UITableViewDelegate` extension below) suppresses the
+        // delete-style red handle — favourites are removed via the heart
+        // toggle on the station detail page, not from this list.
+        tableView.isEditing = true
+        tableView.allowsSelectionDuringEditing = true
         view.addSubview(tableView)
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -167,15 +174,20 @@ extension FavoritesViewController: UITableViewDataSource {
         return cell
     }
 
+    // canEditRowAt must return true for the row to be reorderable in
+    // permanent edit mode; editingStyle below suppresses the delete handle.
     func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool { true }
 
-    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        guard editingStyle == .delete else { return }
-        let stationId = rows[indexPath.row].stationId
-        rows.remove(at: indexPath.row)
-        tableView.deleteRows(at: [indexPath], with: .automatic)
-        if rows.isEmpty { showEmptyState() }
-        Task { try? await RadioFavoritesManager.shared.removeFavorite(stationId: stationId) }
+    func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool { rows.count > 1 }
+
+    func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath) {
+        guard sourceIndexPath != destinationIndexPath else { return }
+        let row = rows.remove(at: sourceIndexPath.row)
+        rows.insert(row, at: destinationIndexPath.row)
+        // Persist immediately. Order is local-only (UserDefaults keyed on
+        // user id) per RadioFavoritesManager's contract — no Supabase round-
+        // trip needed for reorder.
+        RadioFavoritesManager.shared.setOrder(rows.map(\.stationId))
     }
 }
 
@@ -186,4 +198,11 @@ extension FavoritesViewController: UITableViewDelegate {
         let detail = StationDetailViewController(station: row.toRadioStation())
         navigationController?.pushViewController(detail, animated: true)
     }
+
+    // Suppress the red minus / delete handle that UITableView shows by
+    // default in edit mode. Reorder handle remains because `canMoveRowAt`
+    // returns true above.
+    func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle { .none }
+
+    func tableView(_ tableView: UITableView, shouldIndentWhileEditingRowAt indexPath: IndexPath) -> Bool { false }
 }

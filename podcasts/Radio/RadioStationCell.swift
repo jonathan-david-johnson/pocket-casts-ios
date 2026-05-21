@@ -32,6 +32,7 @@ class RadioStationCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         accessoryType = .disclosureIndicator
+        showsReorderControl = true
         backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         setupLayout()
     }
@@ -56,7 +57,7 @@ class RadioStationCell: UITableViewCell {
             logoView.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -10),
 
             textStack.leadingAnchor.constraint(equalTo: logoView.trailingAnchor, constant: 12),
-            textStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            textStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.layoutMarginsGuide.trailingAnchor),
             textStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
         ])
     }
