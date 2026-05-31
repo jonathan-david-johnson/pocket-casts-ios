@@ -13,7 +13,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Pocket Casts</string>
+	<string>PocketStreams</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -937,7 +937,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Pocket Casts</string>
+	<string>PocketStreams</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
