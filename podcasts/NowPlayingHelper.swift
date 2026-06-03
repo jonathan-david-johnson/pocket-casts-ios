@@ -159,11 +159,6 @@ class NowPlayingHelper {
             } else {
                 nowPlayingInfo[MPMediaItemPropertyGenre] = "Podcast" as NSString
             }
-        } else if let station = episode as? RadioStation {
-            let stationName = station.displayableTitle()
-            nowPlayingInfo[MPMediaItemPropertyArtist] = stationName as NSString
-            nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = stationName as NSString
-            nowPlayingInfo[MPMediaItemPropertyGenre] = "Radio" as NSString
         } else {
             nowPlayingInfo[MPMediaItemPropertyArtist] = "PocketCasts" as NSString
             nowPlayingInfo[MPMediaItemPropertyComposer] = "PocketCasts" as NSString
@@ -172,6 +167,7 @@ class NowPlayingHelper {
 
         return nowPlayingInfo
     }
+
 
     private class func addUpToInformationToNowPlaying(_ nowPlaying: [String: AnyObject], duration: TimeInterval, upTo: TimeInterval, playbackRate: Double?) -> [String: AnyObject] {
         var nowPlayingClone = nowPlaying

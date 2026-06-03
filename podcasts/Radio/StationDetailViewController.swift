@@ -96,6 +96,22 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private var isFavorited = false
     private var favoriteLoadTask: Task<Void, Never>?
 
+    private var fingerprinter: ACRFingerprinter?
+    private var isIdentifying = false
+
+    private lazy var identifyButton: UIButton = {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Identify"
+        config.image = UIImage(systemName: "music.note.list")
+        config.imagePadding = 8
+        config.cornerStyle = .capsule
+        let btn = UIButton(configuration: config)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.addAction(UIAction { [weak self] _ in self?.identifyTrack() }, for: .touchUpInside)
+        btn.isHidden = true
+        return btn
+    }()
+
     init(station: RadioStation) {
         self.station = station
         super.init(nibName: nil, bundle: nil)
@@ -130,6 +146,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         tracklistTable.dataSource = self
         tracklistTable.delegate = self
         tracklistTable.isHidden = (station.tracklistUrl == nil)
+        updateIdentifyButton()
 
         if let cached = RadioTracklistService.shared.cached(stationId: station.uuid) {
             self.entries = Array(cached.prefix(5))
@@ -165,6 +182,8 @@ class StationDetailViewController: SimpleNotificationsViewController {
         super.viewDidDisappear(animated)
         pendingTracklistTask?.cancel()
         pendingTracklistTask = nil
+        fingerprinter?.cancel()
+        fingerprinter = nil
     }
 
     deinit {
@@ -203,8 +222,8 @@ class StationDetailViewController: SimpleNotificationsViewController {
         buttonStack.distribution = .fillEqually
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        // Layout: logo → name → ICY title → ICY artist → bitrate → buttons
-        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, nowPlayingTitleLabel, nowPlayingArtistLabel, bitrateLabel, buttonStack])
+        // Layout: logo → name → ICY title → ICY artist → bitrate → buttons → identify
+        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, nowPlayingTitleLabel, nowPlayingArtistLabel, bitrateLabel, buttonStack, identifyButton])
         mainStack.axis = .vertical
         mainStack.spacing = 12
         mainStack.alignment = .center
@@ -268,6 +287,69 @@ class StationDetailViewController: SimpleNotificationsViewController {
         nowPlayingTitleLabel.isHidden = !hasTitle
         nowPlayingArtistLabel.text = icyArtist
         nowPlayingArtistLabel.isHidden = !hasArtist
+    }
+
+    // MARK: - ACR Fingerprinting
+
+    private func updateIdentifyButton() {
+        let hasTracklist = station.tracklistUrl != nil
+        // Show when: tracklist supported but currently empty (stalled/down)
+        // For testing: always show on tracklist-supported stations
+        identifyButton.isHidden = !hasTracklist
+        updateIdentifyButtonTitle()
+    }
+
+    private func updateIdentifyButtonTitle() {
+        var config = identifyButton.configuration
+        config?.title = isIdentifying ? "Listening…" : "Identify"
+        config?.image = UIImage(systemName: isIdentifying ? "waveform" : "music.note.list")
+        identifyButton.configuration = config
+        identifyButton.isEnabled = !isIdentifying
+    }
+
+    private func identifyTrack() {
+        guard !isIdentifying,
+              let url = URL(string: station.streamUrl) else { return }
+        isIdentifying = true
+        updateIdentifyButtonTitle()
+
+        let fp = ACRFingerprinter(streamURL: url)
+        fingerprinter = fp
+        fp.identifyOnce { [weak self] result in
+            guard let self else { return }
+            self.isIdentifying = false
+            self.updateIdentifyButtonTitle()
+            self.insertACRResult(result)
+            Toast.show("\(result.displayTitle)")
+        } onError: { [weak self] _ in
+            guard let self else { return }
+            self.isIdentifying = false
+            self.updateIdentifyButtonTitle()
+            Toast.show("No match found")
+        }
+    }
+
+    private func insertACRResult(_ result: ACRFingerprintResult) {
+        let entry = TracklistEntry(
+            title: result.title,
+            artist: result.artist,
+            album: result.album.isEmpty ? nil : result.album,
+            albumArtURL: nil,
+            playedAt: Date()
+        )
+        entries.insert(entry, at: 0)
+        if entries.count > 5 { entries = Array(entries.prefix(5)) }
+        tracklistTable.reloadData()
+
+        // Resolve artwork asynchronously via existing resolver
+        TrackArtworkResolver.shared.artworkURL(for: entry, station: station) { [weak self] artURL in
+            guard let self, let artURL, let idx = self.entries.firstIndex(of: entry) else { return }
+            let updated = TracklistEntry(title: entry.title, artist: entry.artist,
+                                         album: entry.album, albumArtURL: artURL,
+                                         playedAt: entry.playedAt)
+            self.entries[idx] = updated
+            self.tracklistTable.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
+        }
     }
 
     @MainActor
