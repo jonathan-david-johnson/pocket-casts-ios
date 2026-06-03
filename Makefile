@@ -10,9 +10,15 @@ SIMULATOR_NAME = $(shell xcrun simctl list devices available \
 	| tail -1 | sed 's/^[[:space:]]*//' | sed 's/ *(.*) *$$//')
 
 SIM_UDID = F0042A02-0973-4694-B267-49A1CC21FE19
-SIM_BUNDLE_ID = au.com.shiftyjelly.podcasts
+SIM_BUNDLE_ID = com.jdj.pocketradio
 
-.PHONY: help build clean test lint lint_lenient format install_dependencies build_sim run_sim launch_sim
+# Personal-team install on a physical device (free Apple ID, 7-day expiry).
+DEVICE_UDID = 8119F0C0-0772-5040-93CA-A592AC45C465
+DEVICE_TEAM_ID = 77WV2LMG2L
+DEVICE_BUNDLE_ID_ROOT = com.jdj.pocketradio
+DEVICE_BUNDLE_ID = $(DEVICE_BUNDLE_ID_ROOT)
+
+.PHONY: help build clean test lint lint_lenient format install_dependencies build_sim run_sim launch_sim build_device run_device
 
 define run_in_buildtools
 	@pushd BuildTools && \
@@ -97,6 +103,32 @@ run_sim: build_sim launch_sim ## Build, install, and launch app on iPhone 17 Pro
 	echo "Installing $$APP_PATH"; \
 	xcrun simctl install $(SIM_UDID) "$$APP_PATH"; \
 	xcrun simctl launch $(SIM_UDID) $(SIM_BUNDLE_ID)
+
+build_device: ## Build StagingDebug for Jonathan iPhone, signed with personal team
+	xcodebuild -project podcasts.xcodeproj \
+	   -scheme "Pocket Casts Staging" \
+	   -configuration StagingDebug \
+	   -destination 'platform=iOS,id=$(DEVICE_UDID)' \
+	   -allowProvisioningUpdates \
+	   DEVELOPMENT_TEAM=$(DEVICE_TEAM_ID) \
+	   PRODUCT_BUNDLE_IDENTIFIER_ROOT=$(DEVICE_BUNDLE_ID_ROOT) \
+	   CODE_SIGN_STYLE=Automatic \
+	   PROVISIONING_PROFILE_SPECIFIER="" \
+	   PROVISIONING_PROFILE="" \
+	   build
+
+run_device: build_device ## Build, install, and launch on Jonathan iPhone
+	@APP_PATH=$$(xcodebuild -project podcasts.xcodeproj \
+	   -scheme "Pocket Casts Staging" \
+	   -configuration StagingDebug \
+	   -destination 'platform=iOS,id=$(DEVICE_UDID)' \
+	   DEVELOPMENT_TEAM=$(DEVICE_TEAM_ID) \
+	   PRODUCT_BUNDLE_IDENTIFIER_ROOT=$(DEVICE_BUNDLE_ID_ROOT) \
+	   -showBuildSettings 2>/dev/null \
+	   | awk -F' = ' '/ BUILT_PRODUCTS_DIR / {d=$$2} / WRAPPER_NAME / {w=$$2} END {print d "/" w}'); \
+	echo "Installing $$APP_PATH on $(DEVICE_UDID)"; \
+	xcrun devicectl device install app --device $(DEVICE_UDID) "$$APP_PATH"; \
+	xcrun devicectl device process launch --device $(DEVICE_UDID) $(DEVICE_BUNDLE_ID)
 
 format: ## Lint and autocorrect linter errors
 	$(call run_in_buildtools,$(SWIFTLINT_FROM_BUILDTOOLS) --autocorrect)

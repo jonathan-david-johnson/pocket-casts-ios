@@ -1,5 +1,5 @@
 ---
-name: update_swiftui_uikit_for_dynamic_type_support
+name: update-swiftui-uikit-for-dynamic-type-support
 description: >
   Expert guidance for Dynamic Type support for Pocket Casts iOS development with Swift, UIKit, and SwiftUI.
   Use this skill when the user asks about Dynamic Type, content size categories, accessibility text size, font scaling, or making text/UI

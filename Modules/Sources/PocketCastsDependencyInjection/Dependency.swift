@@ -10,7 +10,12 @@ public struct Dependency<Container: DependencyContainer, T> {
         set { container[keyPath: keyPath] = newValue }
     }
 
-    public init(container: Container = DefaultDependencyContainer.current, _ keyPath: WritableKeyPath<Container, T>) {
+    public init(_ keyPath: WritableKeyPath<Container, T>) where Container == DefaultDependencyContainer {
+        self.container = DefaultDependencyContainer.current
+        self.keyPath = keyPath
+    }
+
+    public init(container: Container, _ keyPath: WritableKeyPath<Container, T>) {
         self.container = container
         self.keyPath = keyPath
     }

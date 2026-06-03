@@ -85,6 +85,21 @@ class NowPlayingHelper {
     }
     #endif
 
+    /// Update title/artist in MPNowPlayingInfoCenter when ICY/tracklist track changes.
+    /// Keeps existing fields (artwork, progress) intact.
+    class func setRadioTrackInfo(trackTitle: String, artist: String, stationName: String) {
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        if trackTitle.isEmpty {
+            info[MPMediaItemPropertyTitle] = stationName as NSString
+            info[MPMediaItemPropertyArtist] = stationName as NSString
+        } else {
+            info[MPMediaItemPropertyTitle] = trackTitle as NSString
+            info[MPMediaItemPropertyArtist] = artist.isEmpty ? stationName : artist as NSString
+        }
+        info[MPMediaItemPropertyAlbumTitle] = stationName as NSString
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
     class func clearNowPlayingInfo() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
@@ -144,6 +159,11 @@ class NowPlayingHelper {
             } else {
                 nowPlayingInfo[MPMediaItemPropertyGenre] = "Podcast" as NSString
             }
+        } else if let station = episode as? RadioStation {
+            let stationName = station.displayableTitle()
+            nowPlayingInfo[MPMediaItemPropertyArtist] = stationName as NSString
+            nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = stationName as NSString
+            nowPlayingInfo[MPMediaItemPropertyGenre] = "Radio" as NSString
         } else {
             nowPlayingInfo[MPMediaItemPropertyArtist] = "PocketCasts" as NSString
             nowPlayingInfo[MPMediaItemPropertyComposer] = "PocketCasts" as NSString

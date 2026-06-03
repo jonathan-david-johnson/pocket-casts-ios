@@ -432,6 +432,13 @@ class PlaybackManager: ServerPlaybackDelegate {
               let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
         let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
         let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
+        if let station = RadioStationRegistry.shared.station(for: stationId),
+           currentEpisode()?.uuid == stationId {
+            let stationName = station.displayableTitle()
+            DispatchQueue.main.async {
+                NowPlayingHelper.setRadioTrackInfo(trackTitle: title, artist: artist, stationName: stationName)
+            }
+        }
         resolveRadioArtworkForLockScreen(stationId: stationId, icyArtist: artist, icyTitle: title)
     }
 
