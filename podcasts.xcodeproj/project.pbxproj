@@ -327,6 +327,8 @@
 		46FBD8B7276A874F00867746 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 46FBD8B9276A874F00867746 /* Intents.intentdefinition */; settings = {ATTRIBUTES = (codegen, ); }; };
 		4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B52FAFB7780051B62B /* RadioStation.swift */; };
 		4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */; };
+		4D11D9A12FAFB7780051B62B /* LyricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D9A02FAFB7780051B62B /* LyricsService.swift */; };
+		4D11D9A32FAFB7780051B62B /* LyricsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D9A22FAFB7780051B62B /* LyricsViewController.swift */; };
 		4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */; };
 		4D11D3BC2FAFB7780051B62B /* CuratedStation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */; };
 		4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */; };
@@ -1959,6 +1961,8 @@
 		4D11D3AA2FAFB7780051B62B /* RadioStationRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStationRegistry.swift; sourceTree = "<group>"; };
 		4D11D3B52FAFB7780051B62B /* RadioStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStation.swift; sourceTree = "<group>"; };
 		4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamsHostViewController.swift; sourceTree = "<group>"; };
+		4D11D9A02FAFB7780051B62B /* LyricsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsService.swift; sourceTree = "<group>"; };
+		4D11D9A22FAFB7780051B62B /* LyricsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsViewController.swift; sourceTree = "<group>"; };
 		4D11D3BB2FAFB7780051B62B /* CuratedStation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedStation.swift; sourceTree = "<group>"; };
 		4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioStationCell.swift; sourceTree = "<group>"; };
 		4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationDetailViewController.swift; sourceTree = "<group>"; };
@@ -3669,6 +3673,8 @@
 				4D11D3F02FAFB7780051B62B /* CuratedEnhancement.swift */,
 				4D11D3B62FAFB7780051B62B /* StreamsHostViewController.swift */,
 				4D11D3C12FAFB7780051B62B /* StationDetailViewController.swift */,
+				4D11D9A02FAFB7780051B62B /* LyricsService.swift */,
+				4D11D9A22FAFB7780051B62B /* LyricsViewController.swift */,
 				4D11D3BD2FAFB7780051B62B /* RadioStationCell.swift */,
 				4D11D3C52FAFB7780051B62B /* RadioSupabase.swift */,
 				4D11D3C72FAFB7780051B62B /* RadioFavoritesManager.swift */,
@@ -7200,6 +7206,8 @@
 				4D11D3BA2FAFB7780051B62B /* RadioStationRegistry.swift in Sources */,
 				4D11D3B82FAFB7780051B62B /* RadioStation.swift in Sources */,
 				4D11D3B92FAFB7780051B62B /* StreamsHostViewController.swift in Sources */,
+				4D11D9A12FAFB7780051B62B /* LyricsService.swift in Sources */,
+				4D11D9A32FAFB7780051B62B /* LyricsViewController.swift in Sources */,
 				4D11D3BC2FAFB7780051B62B /* CuratedStation.swift in Sources */,
 				4D11D3F12FAFB7780051B62B /* CuratedEnhancement.swift in Sources */,
 				4D11D3BE2FAFB7780051B62B /* RadioStationCell.swift in Sources */,

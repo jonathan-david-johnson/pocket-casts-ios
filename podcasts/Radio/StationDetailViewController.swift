@@ -91,6 +91,40 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private var icyArtist: String = ""
     private var pendingTracklistTask: Task<Void, Never>?
 
+    // MARK: - Lyrics
+
+    private let lyricHeaderView: UIView = {
+        let v = UIView()
+        v.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        return v
+    }()
+
+    private let lyricHeaderLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 14)
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
+        l.numberOfLines = 1
+        l.lineBreakMode = .byTruncatingTail
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let lyricHeaderSeparator: UIView = {
+        let v = UIView()
+        v.backgroundColor = AppTheme.colorForStyle(.primaryUi05)
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private var lyricLines: [LyricLine] = []
+    private var lyricStartDate: Date?
+    private var lyricTimer: Timer?
+    private var lyricFetchTask: Task<Void, Never>?
+    private var currentLyricSongKey: String?
+    private var currentLyricLineIndex: Int = 0
+
+    private var hasLyrics: Bool { !lyricLines.isEmpty || lyricHeaderLabel.text?.isEmpty == false }
+
     private var hasAnyICY: Bool { !icyTitle.isEmpty }
 
     private var isFavorited = false
@@ -145,6 +179,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         tracklistTable.register(TracklistCell.self, forCellReuseIdentifier: TracklistCell.reuseIdentifier)
         tracklistTable.dataSource = self
         tracklistTable.delegate = self
+        setupLyricHeader()
         tracklistTable.isHidden = (station.tracklistUrl == nil)
         updateIdentifyButton()
 
@@ -184,6 +219,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         pendingTracklistTask = nil
         fingerprinter?.cancel()
         fingerprinter = nil
+        stopLyricTimer()
     }
 
     deinit {
@@ -205,6 +241,9 @@ class StationDetailViewController: SimpleNotificationsViewController {
         bitrateLabel.textColor = AppTheme.colorForStyle(.primaryText02)
         nowPlayingArtistLabel.textColor = AppTheme.colorForStyle(.primaryText02)
         tracklistTable.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        lyricHeaderView.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        lyricHeaderLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        lyricHeaderSeparator.backgroundColor = AppTheme.colorForStyle(.primaryUi05)
         tracklistTable.reloadData()
     }
 
@@ -359,6 +398,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
             let fresh = try await RadioTracklistService.shared.fetch(stationId: station.uuid, url: url)
             self.entries = Array(fresh.prefix(5))
             self.tracklistTable.reloadData()
+            self.loadLyrics(for: self.entries.first)
         } catch {
             // Surface one toast per session per station. The service tracks
             // the dedupe state itself.
@@ -422,6 +462,117 @@ class StationDetailViewController: SimpleNotificationsViewController {
         }
     }
 
+    // MARK: - Lyrics
+
+    private func setupLyricHeader() {
+        lyricHeaderView.addSubview(lyricHeaderLabel)
+        lyricHeaderView.addSubview(lyricHeaderSeparator)
+        NSLayoutConstraint.activate([
+            lyricHeaderLabel.leadingAnchor.constraint(equalTo: lyricHeaderView.leadingAnchor, constant: 16),
+            lyricHeaderLabel.trailingAnchor.constraint(equalTo: lyricHeaderView.trailingAnchor, constant: -16),
+            lyricHeaderLabel.centerYAnchor.constraint(equalTo: lyricHeaderView.centerYAnchor),
+
+            lyricHeaderSeparator.leadingAnchor.constraint(equalTo: lyricHeaderView.leadingAnchor),
+            lyricHeaderSeparator.trailingAnchor.constraint(equalTo: lyricHeaderView.trailingAnchor),
+            lyricHeaderSeparator.bottomAnchor.constraint(equalTo: lyricHeaderView.bottomAnchor),
+            lyricHeaderSeparator.heightAnchor.constraint(equalToConstant: 0.5)
+        ])
+    }
+
+    private func songKey(for entry: TracklistEntry) -> String {
+        "\(entry.artist.lowercased())|\(entry.title.lowercased())"
+    }
+
+    private func loadLyrics(for entry: TracklistEntry?) {
+        guard let entry, !entry.title.isEmpty else { return }
+        let key = songKey(for: entry)
+        // Same song already loaded — leave the running timer alone.
+        if currentLyricSongKey == key { return }
+
+        lyricFetchTask?.cancel()
+        stopLyricTimer()
+        lyricHeaderLabel.text = nil
+        currentLyricSongKey = key
+        tracklistTable.reloadSections([0], with: .none)
+
+        lyricFetchTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await LyricsService.shared.fetch(artist: entry.artist, title: entry.title, album: entry.album)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard self.currentLyricSongKey == key else { return }
+                guard let result else {
+                    // No lyrics — header stays hidden.
+                    self.currentLyricSongKey = nil
+                    return
+                }
+                if result.hasSynced {
+                    self.lyricLines = result.lines
+                    let offset = entry.playedAt.map { Date().timeIntervalSince($0) } ?? 0
+                    self.startLyricTimer(offset: offset)
+                } else if let plain = result.plain, let firstLine = self.firstNonEmptyLine(plain) {
+                    self.lyricHeaderLabel.text = "♪ " + firstLine
+                    self.tracklistTable.reloadSections([0], with: .none)
+                } else {
+                    self.currentLyricSongKey = nil
+                }
+            }
+        }
+    }
+
+    private func firstNonEmptyLine(_ text: String) -> String? {
+        text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+    }
+
+    private func startLyricTimer(offset: TimeInterval) {
+        lyricStartDate = Date().addingTimeInterval(-offset)
+        currentLyricLineIndex = lyricLineIndex(for: offset)
+        updateLyricHeaderText()
+        tracklistTable.reloadSections([0], with: .none)
+
+        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.lyricTimerTick()
+        }
+        lyricTimer = timer
+    }
+
+    private func lyricTimerTick() {
+        guard let start = lyricStartDate else { return }
+        let offset = Date().timeIntervalSince(start)
+        let newIndex = lyricLineIndex(for: offset)
+        guard newIndex != currentLyricLineIndex else { return }
+        currentLyricLineIndex = newIndex
+        updateLyricHeaderText()
+        tracklistTable.reloadSections([0], with: .none)
+    }
+
+    /// Index of the last line whose timestamp <= offset, clamped to bounds.
+    private func lyricLineIndex(for offset: TimeInterval) -> Int {
+        guard !lyricLines.isEmpty else { return 0 }
+        var idx = 0
+        for (i, line) in lyricLines.enumerated() where line.timestamp <= offset {
+            idx = i
+        }
+        return idx
+    }
+
+    private func updateLyricHeaderText() {
+        guard currentLyricLineIndex < lyricLines.count else { return }
+        lyricHeaderLabel.text = "♪ " + lyricLines[currentLyricLineIndex].text
+    }
+
+    private func stopLyricTimer() {
+        lyricTimer?.invalidate()
+        lyricTimer = nil
+        lyricLines = []
+        lyricStartDate = nil
+        lyricFetchTask?.cancel()
+        lyricFetchTask = nil
+        currentLyricSongKey = nil
+    }
+
 }
 
 // MARK: - UITableViewDataSource
@@ -441,4 +592,34 @@ extension StationDetailViewController: UITableViewDataSource {
 
 // MARK: - UITableViewDelegate
 
-extension StationDetailViewController: UITableViewDelegate {}
+extension StationDetailViewController: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        hasLyrics ? lyricHeaderView : nil
+    }
+
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        hasLyrics ? 44 : 0
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard indexPath.row < entries.count else { return }
+        let entry = entries[indexPath.row]
+
+        let isCurrentSong = indexPath.row == 0 && currentLyricSongKey == songKey(for: entry)
+        let offset = isCurrentSong ? (lyricStartDate.map { Date().timeIntervalSince($0) } ?? 0) : 0
+
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await LyricsService.shared.fetch(artist: entry.artist, title: entry.title, album: entry.album)
+            await MainActor.run {
+                guard let result else {
+                    Toast.show("No lyrics found")
+                    return
+                }
+                let vc = LyricsViewController(entry: entry, lyricsResult: result, offset: offset, isCurrentSong: isCurrentSong)
+                self.navigationController?.pushViewController(vc, animated: true)
+            }
+        }
+    }
+}
