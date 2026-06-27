@@ -143,6 +143,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         RadioFavoritesSeeder.seedIfNeeded()
 
+        if SyncManager.isUserLoggedIn() {
+            RemoteControlManager.shared.start()
+        }
+
         return true
     }
 
