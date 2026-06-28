@@ -21,6 +21,10 @@ Build/run helpers on the pinned sim:
 - `make run_sim` — build, boot Simulator.app, install, and launch the app
 - `SIM_UDID=...` overrides the default sim
 
+## Committing
+
+**Never commit without explicit user approval after manual testing.** Build + tests passing is not sufficient — always stop and ask the user to test the feature before creating any commit.
+
 ## Formatting
 
 Format all code using the linter formatter:
