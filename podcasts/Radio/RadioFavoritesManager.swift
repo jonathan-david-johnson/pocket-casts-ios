@@ -14,8 +14,18 @@ extension Notification.Name {
     static let radioFavoritesChanged = Notification.Name("radioFavoritesChanged")
 }
 
+struct LyricOffset: Decodable {
+    let station_id: String
+    let offset_seconds: Int
+}
+
 class RadioFavoritesManager {
     static let shared = RadioFavoritesManager()
+
+    /// In-memory cache of per-station lyric sync offsets (seconds), loaded from
+    /// Supabase once per app launch. Keyed by station id. Consumers can read
+    /// directly; writers should call `upsertLyricOffset`.
+    private(set) var lyricOffsets: [String: Int] = [:]
 
     /// UserDefaults key for the local custom ordering (per signed-in user).
     /// Value: `[stationId]` in display order. Supabase row order
@@ -118,5 +128,53 @@ class RadioFavoritesManager {
             .execute()
             .value
         return !results.isEmpty
+    }
+
+    // MARK: - Lyric sync offsets
+
+    /// Load all saved lyric offsets for the signed-in user. Returns [stationId: seconds].
+    /// Safe to call when signed out — returns an empty dictionary without throwing.
+    func fetchLyricOffsets() async -> [String: Int] {
+        guard let userId = ServerSettings.userId else { return [:] }
+        do {
+            let db = try RadioSupabase.client()
+            let rows: [LyricOffset] = try await db
+                .from("lyric_offsets")
+                .select("station_id,offset_seconds")
+                .eq("user_uuid", value: userId)
+                .execute()
+                .value
+            let offsets = Dictionary(uniqueKeysWithValues: rows.map { ($0.station_id, $0.offset_seconds) })
+            lyricOffsets = offsets
+            return offsets
+        } catch {
+            return [:]
+        }
+    }
+
+    /// Persist the offset for one station. Updates the local cache on success.
+    func upsertLyricOffset(stationId: String, seconds: Int) async {
+        guard let userId = ServerSettings.userId else { return }
+        struct Payload: Encodable {
+            let user_uuid: String
+            let station_id: String
+            let offset_seconds: Int
+            let updated_at: String
+        }
+        do {
+            let db = try RadioSupabase.client()
+            try await db
+                .from("lyric_offsets")
+                .upsert(Payload(
+                    user_uuid: userId,
+                    station_id: stationId,
+                    offset_seconds: seconds,
+                    updated_at: ISO8601DateFormatter().string(from: Date())
+                ))
+                .execute()
+            lyricOffsets[stationId] = seconds
+        } catch {
+            // Best-effort persistence; callers can log if needed.
+        }
     }
 }

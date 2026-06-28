@@ -1,3 +1,4 @@
+import Kingfisher
 import UIKit
 
 class RadioStationCell: UITableViewCell {
@@ -39,6 +40,13 @@ class RadioStationCell: UITableViewCell {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        logoView.kf.cancelDownloadTask()
+        logoView.image = UIImage(systemName: "radio")
+        logoView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
+    }
+
     private func setupLayout() {
         let textStack = UIStackView(arrangedSubviews: [nameLabel, cityLabel])
         textStack.axis = .vertical
@@ -78,13 +86,17 @@ class RadioStationCell: UITableViewCell {
         applyTheme()
         nameLabel.text = name
         cityLabel.text = city
-        logoView.image = UIImage(systemName: "radio")
+        let placeholder = UIImage(systemName: "radio")
         logoView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
-        guard let urlString = faviconUrl, let url = URL(string: urlString) else { return }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard let data, let image = UIImage(data: data) else { return }
-            DispatchQueue.main.async { self?.logoView.image = image }
-        }.resume()
+        guard let urlString = faviconUrl, let url = URL(string: urlString) else {
+            logoView.image = placeholder
+            return
+        }
+        logoView.kf.setImage(
+            with: url,
+            placeholder: placeholder,
+            options: [.targetCache(ImageManager.sharedManager.stationFaviconCache), .transition(.fade(0.15))]
+        )
     }
 
     /// Cells are reused — re-read theme colours every configure so a theme

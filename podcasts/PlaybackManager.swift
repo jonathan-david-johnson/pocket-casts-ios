@@ -435,8 +435,11 @@ class PlaybackManager: ServerPlaybackDelegate {
         if let station = RadioStationRegistry.shared.station(for: stationId),
            currentEpisode()?.uuid == stationId {
             let stationName = station.displayableTitle()
+            let tracklistEntry = RadioTracklistService.shared.cached(stationId: stationId)?.first
+            let resolvedArtist = artist.isEmpty ? (tracklistEntry?.artist ?? "") : artist
+            let album = tracklistEntry?.album
             DispatchQueue.main.async {
-                NowPlayingHelper.setRadioTrackInfo(trackTitle: title, artist: artist, stationName: stationName)
+                NowPlayingHelper.setRadioTrackInfo(trackTitle: title, artist: resolvedArtist, album: album, stationName: stationName)
             }
         }
         resolveRadioArtworkForLockScreen(stationId: stationId, icyArtist: artist, icyTitle: title)
@@ -473,7 +476,8 @@ class PlaybackManager: ServerPlaybackDelegate {
             // which is main-thread only. Kingfisher's completion fires on a
             // background queue, so dispatch to main.
             if let url {
-                KingfisherManager.shared.retrieveImage(with: url) { result in
+                let artCache = ImageManager.sharedManager.radioAlbumArtCache
+                KingfisherManager.shared.retrieveImage(with: url, options: [.targetCache(artCache)]) { result in
                     guard self.lastResolvedRadioKey == key else { return }
                     DispatchQueue.main.async {
                         if let image = try? result.get().image {

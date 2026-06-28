@@ -2,6 +2,7 @@ import UIKit
 
 class StationDetailViewController: SimpleNotificationsViewController {
     private let station: RadioStation
+    private let lyricSync: LyricSyncController
 
     private let logoView: UIImageView = {
         let iv = UIImageView()
@@ -11,23 +12,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
         iv.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
-    }()
-
-    private let nameLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 24, weight: .bold)
-        l.textAlignment = .center
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    private let bitrateLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 13)
-        l.textColor = AppTheme.colorForStyle(.primaryText02)
-        l.textAlignment = .center
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
     }()
 
     private let nowPlayingTitleLabel: UILabel = {
@@ -57,6 +41,12 @@ class StationDetailViewController: SimpleNotificationsViewController {
         config.image = UIImage(systemName: "play.fill")
         config.imagePadding = 8
         config.cornerStyle = .capsule
+        config.buttonSize = .large
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = .systemFont(ofSize: 20, weight: .semibold)
+            return outgoing
+        }
         let btn = UIButton(configuration: config)
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.addAction(UIAction { [weak self] _ in self?.togglePlay() }, for: .touchUpInside)
@@ -65,12 +55,11 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     private lazy var favoriteButton: UIButton = {
         var config = UIButton.Configuration.tinted()
-        config.title = "Favorite"
         config.image = UIImage(systemName: "heart")
-        config.imagePadding = 8
         config.cornerStyle = .capsule
         let btn = UIButton(configuration: config)
         btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.accessibilityLabel = "Favorite"
         btn.addAction(UIAction { [weak self] _ in self?.toggleFavorite() }, for: .touchUpInside)
         return btn
     }()
@@ -90,8 +79,9 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private var icyTitle: String = ""
     private var icyArtist: String = ""
     private var pendingTracklistTask: Task<Void, Never>?
+    private var tracklistRefreshTask: Task<Void, Never>?
 
-    // MARK: - Lyrics
+    // MARK: - Lyrics (UI only — state lives in lyricSync)
 
     private let lyricHeaderView: UIView = {
         let v = UIView()
@@ -116,17 +106,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
         return v
     }()
 
-    private var lyricLines: [LyricLine] = []
-    private var lyricStartDate: Date?
-    private var lyricTimer: Timer?
-    private var lyricFetchTask: Task<Void, Never>?
-    private var currentLyricSongKey: String?
-    private var currentLyricLineIndex: Int = 0
-
-    private var hasLyrics: Bool { !lyricLines.isEmpty || lyricHeaderLabel.text?.isEmpty == false }
-
-    private var hasAnyICY: Bool { !icyTitle.isEmpty }
-
     private var isFavorited = false
     private var favoriteLoadTask: Task<Void, Never>?
 
@@ -135,12 +114,11 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     private lazy var identifyButton: UIButton = {
         var config = UIButton.Configuration.tinted()
-        config.title = "Identify"
         config.image = UIImage(systemName: "music.note.list")
-        config.imagePadding = 8
         config.cornerStyle = .capsule
         let btn = UIButton(configuration: config)
         btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.accessibilityLabel = "Identify"
         btn.addAction(UIAction { [weak self] _ in self?.identifyTrack() }, for: .touchUpInside)
         btn.isHidden = true
         return btn
@@ -148,6 +126,10 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     init(station: RadioStation) {
         self.station = station
+        self.lyricSync = LyricSyncController(
+            stationId: station.stationId,
+            stationDisplayTitle: station.displayableTitle()
+        )
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -167,14 +149,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
             logoView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
         }
         NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
-        nameLabel.text = station.displayableTitle()
-
-        if let bitrate = station.bitrate {
-            bitrateLabel.text = "\(bitrate) kbps"
-            bitrateLabel.isHidden = false
-        } else {
-            bitrateLabel.isHidden = true
-        }
 
         tracklistTable.register(TracklistCell.self, forCellReuseIdentifier: TracklistCell.reuseIdentifier)
         tracklistTable.dataSource = self
@@ -199,27 +173,40 @@ class StationDetailViewController: SimpleNotificationsViewController {
             object: nil
         )
 
+        lyricSync.delegate = self
         loadFavoriteState()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // Reapply theme — user may have changed theme in Settings while this
-        // VC was off-screen; the persistent themeChanged observer covers the
-        // on-screen case.
         themeDidChange()
         if station.tracklistUrl != nil {
-            Task { await refetchTracklist() }
+            startTracklistRefreshLoop()
         }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        tracklistRefreshTask?.cancel()
+        tracklistRefreshTask = nil
         pendingTracklistTask?.cancel()
         pendingTracklistTask = nil
         fingerprinter?.cancel()
         fingerprinter = nil
-        stopLyricTimer()
+        lyricSync.stop()
+    }
+
+    /// Polls the tracklist every 30s while this screen is visible.
+    private func startTracklistRefreshLoop() {
+        tracklistRefreshTask?.cancel()
+        tracklistRefreshTask = Task { [weak self] in
+            await self?.refetchTracklist()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                if Task.isCancelled { return }
+                await self?.refetchTracklist()
+            }
+        }
     }
 
     deinit {
@@ -238,7 +225,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
     @objc private func themeDidChange() {
         applyTheme()
         logoView.backgroundColor = AppTheme.colorForStyle(.primaryUi02)
-        bitrateLabel.textColor = AppTheme.colorForStyle(.primaryText02)
         nowPlayingArtistLabel.textColor = AppTheme.colorForStyle(.primaryText02)
         tracklistTable.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         lyricHeaderView.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
@@ -250,26 +236,23 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private func applyTheme() {
         view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         tracklistTable.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
-        nameLabel.textColor = AppTheme.colorForStyle(.primaryText01)
         nowPlayingTitleLabel.textColor = AppTheme.colorForStyle(.primaryText01)
     }
 
     private func setupLayout() {
-        let buttonStack = UIStackView(arrangedSubviews: [playButton, favoriteButton])
+        let buttonStack = UIStackView(arrangedSubviews: [identifyButton, playButton, favoriteButton])
         buttonStack.axis = .horizontal
         buttonStack.spacing = 16
-        buttonStack.distribution = .fillEqually
+        buttonStack.alignment = .center
+        buttonStack.distribution = .equalSpacing
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        // Layout: logo → name → ICY title → ICY artist → bitrate → buttons → identify
-        let mainStack = UIStackView(arrangedSubviews: [logoView, nameLabel, nowPlayingTitleLabel, nowPlayingArtistLabel, bitrateLabel, buttonStack, identifyButton])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, nowPlayingTitleLabel, nowPlayingArtistLabel, buttonStack])
         mainStack.axis = .vertical
         mainStack.spacing = 12
         mainStack.alignment = .center
-        mainStack.setCustomSpacing(4, after: nameLabel)
         mainStack.setCustomSpacing(2, after: nowPlayingTitleLabel)
-        mainStack.setCustomSpacing(12, after: nowPlayingArtistLabel)
-        mainStack.setCustomSpacing(20, after: bitrateLabel)
+        mainStack.setCustomSpacing(20, after: nowPlayingArtistLabel)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(mainStack)
@@ -308,8 +291,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
             self.icyArtist = artist
             self.updateNowPlayingLabels()
 
-            // Debounced tracklist refetch: cancel previous pending task, start a new one
-            // that waits 2 seconds before fetching (coalesces rapid ICY frame bursts).
             self.pendingTracklistTask?.cancel()
             self.pendingTracklistTask = Task { [weak self] in
                 do { try await Task.sleep(nanoseconds: 2_000_000_000) } catch { return }
@@ -332,17 +313,15 @@ class StationDetailViewController: SimpleNotificationsViewController {
 
     private func updateIdentifyButton() {
         let hasTracklist = station.tracklistUrl != nil
-        // Show when: tracklist supported but currently empty (stalled/down)
-        // For testing: always show on tracklist-supported stations
         identifyButton.isHidden = !hasTracklist
         updateIdentifyButtonTitle()
     }
 
     private func updateIdentifyButtonTitle() {
         var config = identifyButton.configuration
-        config?.title = isIdentifying ? "Listening…" : "Identify"
         config?.image = UIImage(systemName: isIdentifying ? "waveform" : "music.note.list")
         identifyButton.configuration = config
+        identifyButton.accessibilityLabel = isIdentifying ? "Listening…" : "Identify"
         identifyButton.isEnabled = !isIdentifying
     }
 
@@ -380,7 +359,6 @@ class StationDetailViewController: SimpleNotificationsViewController {
         if entries.count > 5 { entries = Array(entries.prefix(5)) }
         tracklistTable.reloadData()
 
-        // Resolve artwork asynchronously via existing resolver
         TrackArtworkResolver.shared.artworkURL(for: entry, station: station) { [weak self] artURL in
             guard let self, let artURL, let idx = self.entries.firstIndex(of: entry) else { return }
             let updated = TracklistEntry(title: entry.title, artist: entry.artist,
@@ -396,12 +374,23 @@ class StationDetailViewController: SimpleNotificationsViewController {
         guard let url = station.tracklistUrl, !url.isEmpty else { return }
         do {
             let fresh = try await RadioTracklistService.shared.fetch(stationId: station.uuid, url: url)
+            let previousTopKey = entries.first.map { lyricSync.songKey(for: $0) }
             self.entries = Array(fresh.prefix(5))
             self.tracklistTable.reloadData()
-            self.loadLyrics(for: self.entries.first)
+            self.lyricSync.load(entry: self.entries.first)
+            // Sync car/lockscreen when tracklist detects a new top song (covers stations
+            // where ICY is absent or fires late).
+            if let newTop = self.entries.first,
+               lyricSync.songKey(for: newTop) != previousTopKey,
+               PlaybackManager.shared.currentEpisode()?.uuid == station.uuid {
+                NowPlayingHelper.setRadioTrackInfo(
+                    trackTitle: newTop.title,
+                    artist: newTop.artist,
+                    album: newTop.album,
+                    stationName: station.displayableTitle()
+                )
+            }
         } catch {
-            // Surface one toast per session per station. The service tracks
-            // the dedupe state itself.
             if RadioTracklistService.shared.shouldShowFailureToast(stationId: station.uuid) {
                 Toast.show("Couldn't load tracklist for \(station.displayableTitle())")
             }
@@ -441,8 +430,8 @@ class StationDetailViewController: SimpleNotificationsViewController {
         isFavorited = favorited
         var config = favoriteButton.configuration
         config?.image = UIImage(systemName: favorited ? "heart.fill" : "heart")
-        config?.title = favorited ? "Favorited" : "Favorite"
         favoriteButton.configuration = config
+        favoriteButton.accessibilityLabel = favorited ? "Favorited" : "Favorite"
     }
 
     private func toggleFavorite() {
@@ -462,7 +451,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         }
     }
 
-    // MARK: - Lyrics
+    // MARK: - Lyrics header (UI only)
 
     private func setupLyricHeader() {
         lyricHeaderView.addSubview(lyricHeaderLabel)
@@ -479,100 +468,12 @@ class StationDetailViewController: SimpleNotificationsViewController {
         ])
     }
 
-    private func songKey(for entry: TracklistEntry) -> String {
-        "\(entry.artist.lowercased())|\(entry.title.lowercased())"
+    /// Nudge the live sync correction and immediately re-evaluate the current line.
+    /// Returns the new offset so LyricsViewController can keep its local copy in sync.
+    @discardableResult
+    func adjustLyricOffset(by delta: TimeInterval) -> TimeInterval {
+        lyricSync.adjustOffset(by: delta)
     }
-
-    private func loadLyrics(for entry: TracklistEntry?) {
-        guard let entry, !entry.title.isEmpty else { return }
-        let key = songKey(for: entry)
-        // Same song already loaded — leave the running timer alone.
-        if currentLyricSongKey == key { return }
-
-        lyricFetchTask?.cancel()
-        stopLyricTimer()
-        lyricHeaderLabel.text = nil
-        currentLyricSongKey = key
-        tracklistTable.reloadSections([0], with: .none)
-
-        lyricFetchTask = Task { [weak self] in
-            guard let self else { return }
-            let result = await LyricsService.shared.fetch(artist: entry.artist, title: entry.title, album: entry.album)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard self.currentLyricSongKey == key else { return }
-                guard let result else {
-                    // No lyrics — header stays hidden.
-                    self.currentLyricSongKey = nil
-                    return
-                }
-                if result.hasSynced {
-                    self.lyricLines = result.lines
-                    let offset = entry.playedAt.map { Date().timeIntervalSince($0) } ?? 0
-                    self.startLyricTimer(offset: offset)
-                } else if let plain = result.plain, let firstLine = self.firstNonEmptyLine(plain) {
-                    self.lyricHeaderLabel.text = "♪ " + firstLine
-                    self.tracklistTable.reloadSections([0], with: .none)
-                } else {
-                    self.currentLyricSongKey = nil
-                }
-            }
-        }
-    }
-
-    private func firstNonEmptyLine(_ text: String) -> String? {
-        text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty }
-    }
-
-    private func startLyricTimer(offset: TimeInterval) {
-        lyricStartDate = Date().addingTimeInterval(-offset)
-        currentLyricLineIndex = lyricLineIndex(for: offset)
-        updateLyricHeaderText()
-        tracklistTable.reloadSections([0], with: .none)
-
-        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.lyricTimerTick()
-        }
-        lyricTimer = timer
-    }
-
-    private func lyricTimerTick() {
-        guard let start = lyricStartDate else { return }
-        let offset = Date().timeIntervalSince(start)
-        let newIndex = lyricLineIndex(for: offset)
-        guard newIndex != currentLyricLineIndex else { return }
-        currentLyricLineIndex = newIndex
-        updateLyricHeaderText()
-        tracklistTable.reloadSections([0], with: .none)
-    }
-
-    /// Index of the last line whose timestamp <= offset, clamped to bounds.
-    private func lyricLineIndex(for offset: TimeInterval) -> Int {
-        guard !lyricLines.isEmpty else { return 0 }
-        var idx = 0
-        for (i, line) in lyricLines.enumerated() where line.timestamp <= offset {
-            idx = i
-        }
-        return idx
-    }
-
-    private func updateLyricHeaderText() {
-        guard currentLyricLineIndex < lyricLines.count else { return }
-        lyricHeaderLabel.text = "♪ " + lyricLines[currentLyricLineIndex].text
-    }
-
-    private func stopLyricTimer() {
-        lyricTimer?.invalidate()
-        lyricTimer = nil
-        lyricLines = []
-        lyricStartDate = nil
-        lyricFetchTask?.cancel()
-        lyricFetchTask = nil
-        currentLyricSongKey = nil
-    }
-
 }
 
 // MARK: - UITableViewDataSource
@@ -594,11 +495,11 @@ extension StationDetailViewController: UITableViewDataSource {
 
 extension StationDetailViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        hasLyrics ? lyricHeaderView : nil
+        lyricSync.hasLyrics ? lyricHeaderView : nil
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        hasLyrics ? 44 : 0
+        lyricSync.hasLyrics ? 44 : 0
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -606,20 +507,36 @@ extension StationDetailViewController: UITableViewDelegate {
         guard indexPath.row < entries.count else { return }
         let entry = entries[indexPath.row]
 
-        let isCurrentSong = indexPath.row == 0 && currentLyricSongKey == songKey(for: entry)
-        let offset = isCurrentSong ? (lyricStartDate.map { Date().timeIntervalSince($0) } ?? 0) : 0
+        let isCurrentSong = indexPath.row == 0 && lyricSync.currentSongKey == lyricSync.songKey(for: entry)
+        let elapsed = isCurrentSong ? (lyricSync.lyricStartDate.map { Date().timeIntervalSince($0) } ?? 0) : 0
 
-        Task { [weak self] in
-            guard let self else { return }
-            let result = await LyricsService.shared.fetch(artist: entry.artist, title: entry.title, album: entry.album)
-            await MainActor.run {
-                guard let result else {
-                    Toast.show("No lyrics found")
-                    return
-                }
-                let vc = LyricsViewController(entry: entry, lyricsResult: result, offset: offset, isCurrentSong: isCurrentSong)
-                self.navigationController?.pushViewController(vc, animated: true)
-            }
-        }
+        let vc = LyricsViewController(entry: entry, stationName: station.displayableTitle(), offset: elapsed, isCurrentSong: isCurrentSong)
+        vc.lyricOffset = lyricSync.lyricOffset
+        vc.delegate = self
+        navigationController?.pushViewController(vc, animated: true)
+    }
+}
+
+// MARK: - LyricsViewControllerDelegate
+
+extension StationDetailViewController: LyricsViewControllerDelegate {
+    func lyricsViewController(_ viewController: LyricsViewController, adjustLyricOffsetBy delta: TimeInterval) -> TimeInterval {
+        lyricSync.adjustOffset(by: delta)
+    }
+}
+
+// MARK: - LyricSyncControllerDelegate
+
+extension StationDetailViewController: LyricSyncControllerDelegate {
+    func lyricSyncController(_ c: LyricSyncController, didUpdateHeaderText text: String) {
+        lyricHeaderLabel.text = text
+    }
+
+    func lyricSyncController(_ c: LyricSyncController, didChangeStatus status: LyricSyncController.LyricStatus) {
+        tracklistTable.reloadSections([0], with: .none)
+    }
+
+    func lyricSyncController(_ c: LyricSyncController, didUpdateNowPlayingAlbum text: String) {
+        NowPlayingHelper.setRadioAlbumTitle(text)
     }
 }

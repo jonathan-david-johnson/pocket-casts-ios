@@ -12,6 +12,35 @@ class RemoteControlManager {
     private var channel: RealtimeChannelV2?
     private var listenTask: Task<Void, Never>?
     private var presenceTask: Task<Void, Never>?
+    private var loginObserver: NSObjectProtocol?
+
+    func setup() {
+        loginObserver = NotificationCenter.default.addObserver(forName: .userSignedIn, object: nil, queue: .main) { [weak self] _ in
+            self?.start()
+        }
+        // Also handle token refresh / re-auth path
+        NotificationCenter.default.addObserver(forName: .userLoginDidChange, object: nil, queue: .main) { [weak self] _ in
+            if SyncManager.isUserLoggedIn() {
+                self?.startOrScheduleRetry()
+            } else {
+                self?.stop()
+            }
+        }
+        if SyncManager.isUserLoggedIn() {
+            startOrScheduleRetry()
+        }
+    }
+
+    private func startOrScheduleRetry() {
+        if ServerSettings.userId != nil {
+            start()
+        } else {
+            print("🌐 RemoteControl: userId nil at launch, retrying in 3s")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                self?.startOrScheduleRetry()
+            }
+        }
+    }
 
     var deviceId: String {
         if let existing = UserDefaults.standard.string(forKey: deviceIdKey), !existing.isEmpty {
@@ -23,6 +52,7 @@ class RemoteControlManager {
     }
 
     func start() {
+        guard channel == nil else { return }
         guard let userId = ServerSettings.userId, !userId.isEmpty else { return }
         guard let urlString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String,
               let url = URL(string: urlString) else { return }

@@ -30,6 +30,12 @@ class ImageManager {
     // Discover Cache
     private var discoverCache = ImageCache(name: "discoverCache")
 
+    // Radio album art — track artwork fetched for lock screen / Bluetooth display
+    let radioAlbumArtCache = ImageCache(name: "radioAlbumArtCache")
+
+    // Station favicon / logo images for Favorites and Browse lists
+    let stationFaviconCache = ImageCache(name: "stationFaviconCache")
+
     // Track in-progress artwork loads by UUID
     private var inProgressArtworkLoads = Set<String>()
 
@@ -52,6 +58,13 @@ class ImageManager {
 
         discoverCache.diskStorage.config.expiration = .days(10)
         discoverCache.diskStorage.config.sizeLimit = UInt(50.megabytes)
+
+        radioAlbumArtCache.memoryStorage.config.totalCostLimit = 20.megabytes
+        radioAlbumArtCache.diskStorage.config.sizeLimit = UInt(100.megabytes)
+        radioAlbumArtCache.diskStorage.config.expiration = .days(30)
+
+        stationFaviconCache.diskStorage.config.sizeLimit = UInt(10.megabytes)
+        stationFaviconCache.diskStorage.config.expiration = .days(30)
 
         NotificationCenter.default.addObserver(self, selector: #selector(podcastAddedNotification(notification:)), name: Constants.Notifications.podcastAdded, object: nil)
     }

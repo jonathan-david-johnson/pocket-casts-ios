@@ -276,14 +276,8 @@ extension NowPlayingPlayerItemViewController {
         }
 
         episodeName.text = entry.title
-        // Compose "Artist — Station Name" for the subtitle so the user
-        // still knows which station they're tuned to.
         let stationName = radio.displayableTitle()
-        if !entry.artist.isEmpty {
-            podcastName.text = "\(entry.artist) — \(stationName)"
-        } else {
-            podcastName.text = stationName
-        }
+        podcastName.text = entry.artist.isEmpty ? stationName : entry.artist
     }
     #endif
 

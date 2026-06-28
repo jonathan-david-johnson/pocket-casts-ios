@@ -36,6 +36,22 @@ class FavoritesViewController: UIViewController {
     private var rows: [FavoriteRow] = []
     private var loadTask: Task<Void, Never>?
 
+    /// radio-browser metadata cached across reloads, keyed by station id.
+    /// Persisted to UserDefaults so cold starts show cached names/art immediately
+    /// while the network re-fetch runs in the background.
+    private static var browseCache: [String: RadioBrowserStation] = {
+        guard let data = UserDefaults.standard.data(forKey: "pocketradio.favoritesBrowseCache"),
+              let decoded = try? JSONDecoder().decode([String: RadioBrowserStation].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }()
+
+    private static func persistBrowseCache() {
+        guard let data = try? JSONEncoder().encode(browseCache) else { return }
+        UserDefaults.standard.set(data, forKey: "pocketradio.favoritesBrowseCache")
+    }
+
     init() {
         super.init(nibName: nil, bundle: nil)
     }
@@ -101,8 +117,10 @@ class FavoritesViewController: UIViewController {
             guard let self else { return }
             do {
                 let favorites = try await RadioFavoritesManager.shared.loadFavorites()
+                // Load saved lyric offsets in parallel (best-effort, no UI blocker).
+                async let offsetsTask = RadioFavoritesManager.shared.fetchLyricOffsets()
                 var resolved = favorites.map { fav in
-                    FavoriteRow(stationId: fav.station_id)
+                    FavoriteRow(stationId: fav.station_id, browse: Self.browseCache[fav.station_id])
                 }
 
                 await MainActor.run {
@@ -110,6 +128,7 @@ class FavoritesViewController: UIViewController {
                     self.tableView.reloadData()
                     if resolved.isEmpty { self.showEmptyState() }
                 }
+                _ = await offsetsTask
 
                 // Fetch radio-browser.info metadata for all favorited stations (all are radio-browser UUIDs).
                 await withTaskGroup(of: (Int, RadioBrowserStation?).self) { group in
@@ -121,8 +140,12 @@ class FavoritesViewController: UIViewController {
                         }
                     }
                     for await (i, station) in group {
-                        resolved[i].browse = station
+                        if let station {
+                            resolved[i].browse = station
+                            Self.browseCache[station.stationuuid] = station
+                        }
                     }
+                    Self.persistBrowseCache()
                 }
 
                 await MainActor.run {

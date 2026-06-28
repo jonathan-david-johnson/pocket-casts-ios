@@ -1,17 +1,36 @@
 import UIKit
 
-/// Full-screen lyrics view for a single tracklist entry. Synced lyrics render
-/// as a table that auto-advances (when `isCurrentSong`); plain lyrics render as
-/// a static text view; missing lyrics show a centered empty state.
+protocol LyricsViewControllerDelegate: AnyObject {
+    /// Adjust the station's live lyric offset by `delta` seconds and return the new offset.
+    func lyricsViewController(_ viewController: LyricsViewController, adjustLyricOffsetBy delta: TimeInterval) -> TimeInterval
+}
+
+/// Full-screen lyrics view for a single tracklist entry. Navigates immediately
+/// and fetches lyrics async (cache hit = instant for current song).
 final class LyricsViewController: UIViewController {
     private let entry: TracklistEntry
-    private let lyricsResult: LyricsResult
+    private let stationName: String
     private let initialOffset: TimeInterval
     private let isCurrentSong: Bool
+
+    weak var delegate: LyricsViewControllerDelegate?
+
+    /// Live sync offset copied from the station detail. Updated when the user taps +/-.
+    var lyricOffset: TimeInterval = 0
+
+    private var lyricsResult: LyricsResult?
+    private var fetchTask: Task<Void, Never>?
 
     private var lyricStartDate: Date?
     private var lyricTimer: Timer?
     private var currentLineIndex: Int = 0
+
+    private typealias LyricStatus = LyricSyncController.LyricStatus
+    private var lyricStatus: LyricStatus = .none
+
+    private static let lyricCellID = "LyricLineCell"
+    private static let lyricIntroGrace: TimeInterval = 3
+    private static let lyricEndGrace: TimeInterval = 12
 
     // MARK: - Header
 
@@ -43,6 +62,37 @@ final class LyricsViewController: UIViewController {
         return l
     }()
 
+    private let offsetLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 10, weight: .medium)
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
+        l.textAlignment = .center
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let statusLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 14, weight: .medium)
+        l.textColor = AppTheme.colorForStyle(.primaryText02)
+        l.textAlignment = .center
+        l.numberOfLines = 1
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private lazy var minusButton: UIButton = {
+        let b = Self.makeOffsetButton(label: "−", accessibilityLabel: "Nudge lyrics earlier")
+        b.addAction(UIAction { [weak self] _ in self?.adjustOffset(by: -1) }, for: .touchUpInside)
+        return b
+    }()
+
+    private lazy var plusButton: UIButton = {
+        let b = Self.makeOffsetButton(label: "+", accessibilityLabel: "Nudge lyrics later")
+        b.addAction(UIAction { [weak self] _ in self?.adjustOffset(by: 1) }, for: .touchUpInside)
+        return b
+    }()
+
     private let lyricsTable: UITableView = {
         let tv = UITableView(frame: .zero, style: .plain)
         tv.separatorStyle = .none
@@ -52,13 +102,21 @@ final class LyricsViewController: UIViewController {
         return tv
     }()
 
+    private let spinner: UIActivityIndicatorView = {
+        let s = UIActivityIndicatorView(style: .medium)
+        s.hidesWhenStopped = true
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
+    }()
+
+    /// Kept to toggle visibility once fetch confirms synced lyrics.
+    private var offsetControlsView: UIStackView?
+
     private var artLoadTask: URLSessionDataTask?
 
-    private static let lyricCellID = "LyricLineCell"
-
-    init(entry: TracklistEntry, lyricsResult: LyricsResult, offset: TimeInterval, isCurrentSong: Bool) {
+    init(entry: TracklistEntry, stationName: String, offset: TimeInterval, isCurrentSong: Bool) {
         self.entry = entry
-        self.lyricsResult = lyricsResult
+        self.stationName = stationName
         self.initialOffset = offset
         self.isCurrentSong = isCurrentSong
         super.init(nibName: nil, bundle: nil)
@@ -71,31 +129,48 @@ final class LyricsViewController: UIViewController {
         title = entry.title
         view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         setupHeader()
+        setupStatusLabel()
+        setupSpinner()
 
-        if lyricsResult.hasSynced {
-            setupSyncedTable()
-        } else if let plain = lyricsResult.plain, !plain.isEmpty {
-            setupPlainText(plain)
-        } else {
-            setupEmptyState()
+        fetchTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await LyricsService.shared.fetch(
+                artist: entry.artist, title: entry.title, album: entry.album)
+            await MainActor.run { [weak self] in
+                self?.applyResult(result)
+            }
         }
+
+        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        guard lyricsResult.hasSynced else { return }
-        currentLineIndex = startingIndex(for: initialOffset)
+        // Result may have arrived during push animation (cache hit). Kick off
+        // interactive elements now that the view has a real frame.
+        guard lyricsResult?.hasSynced == true else { return }
         scrollToCurrentLine(animated: false)
-        if isCurrentSong {
-            startTimer()
-        }
+        if isCurrentSong, lyricTimer == nil { startTimer() }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        fetchTask?.cancel()
+        fetchTask = nil
         stopTimer()
         artLoadTask?.cancel()
         artLoadTask = nil
+        NotificationCenter.default.removeObserver(self, name: Constants.Notifications.themeChanged, object: nil)
+    }
+
+    @objc private func themeDidChange() {
+        view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        titleLabel.textColor = AppTheme.colorForStyle(.primaryText01)
+        artistLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        offsetLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        statusLabel.textColor = AppTheme.colorForStyle(.primaryText02)
+        lyricsTable.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        lyricsTable.reloadData()
     }
 
     // MARK: - Header layout
@@ -103,12 +178,30 @@ final class LyricsViewController: UIViewController {
     private func setupHeader() {
         titleLabel.text = entry.title
         artistLabel.text = entry.artist
+        updateOffsetLabel()
 
         let textStack = UIStackView(arrangedSubviews: [titleLabel, artistLabel])
         textStack.axis = .vertical
         textStack.spacing = 2
 
-        let headerStack = UIStackView(arrangedSubviews: [artView, textStack])
+        let artTextStack = UIStackView(arrangedSubviews: [artView, textStack])
+        artTextStack.axis = .horizontal
+        artTextStack.spacing = 12
+        artTextStack.alignment = .center
+
+        let buttonStack = UIStackView(arrangedSubviews: [minusButton, plusButton])
+        buttonStack.axis = .horizontal
+        buttonStack.spacing = 6
+        buttonStack.alignment = .center
+
+        let offsetControls = UIStackView(arrangedSubviews: [buttonStack, offsetLabel])
+        offsetControls.axis = .vertical
+        offsetControls.spacing = 3
+        offsetControls.alignment = .trailing
+        offsetControls.isHidden = true  // shown after fetch confirms synced lyrics
+        offsetControlsView = offsetControls
+
+        let headerStack = UIStackView(arrangedSubviews: [artTextStack, offsetControls])
         headerStack.axis = .horizontal
         headerStack.spacing = 12
         headerStack.alignment = .center
@@ -126,6 +219,64 @@ final class LyricsViewController: UIViewController {
         loadArtwork()
     }
 
+    private func setupStatusLabel() {
+        view.addSubview(statusLabel)
+        NSLayoutConstraint.activate([
+            statusLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 72),
+            statusLabel.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor)
+        ])
+    }
+
+    private func setupSpinner() {
+        view.addSubview(spinner)
+        NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        spinner.startAnimating()
+    }
+
+    private static func makeOffsetButton(label: String, accessibilityLabel: String) -> UIButton {
+        let b = UIButton(type: .system)
+        b.setTitle(label, for: .normal)
+        b.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        b.setTitleColor(AppTheme.colorForStyle(.primaryText02), for: .normal)
+        b.backgroundColor = AppTheme.colorForStyle(.primaryUi05)
+        b.layer.cornerRadius = 5
+        b.accessibilityLabel = accessibilityLabel
+        b.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            b.widthAnchor.constraint(equalToConstant: 44),
+            b.heightAnchor.constraint(equalToConstant: 44)
+        ])
+        return b
+    }
+
+    private func updateOffsetLabel() {
+        offsetLabel.text = "\(lyricOffset >= 0 ? "+" : "")\(Int(lyricOffset))s"
+    }
+
+    private func updateStatusLabel() {
+        switch lyricStatus {
+        case .betweenTracks:
+            statusLabel.text = "♪ " + (stationName.isEmpty ? "On air" : stationName)
+            statusLabel.isHidden = false
+        default:
+            statusLabel.isHidden = true
+        }
+    }
+
+    private func adjustOffset(by delta: TimeInterval) {
+        let newOffset = delegate?.lyricsViewController(self, adjustLyricOffsetBy: delta) ?? (lyricOffset + delta)
+        lyricOffset = newOffset
+        updateOffsetLabel()
+        guard isCurrentSong, lyricsResult?.hasSynced == true, let start = lyricStartDate else { return }
+        let offset = Date().timeIntervalSince(start) + lyricOffset
+        let (newIndex, newStatus) = lineState(for: offset)
+        applyLyricState(index: newIndex, status: newStatus)
+    }
+
     private func loadArtwork() {
         artView.image = UIImage(systemName: "music.note")
         artView.tintColor = AppTheme.colorForStyle(.primaryIcon02)
@@ -139,6 +290,33 @@ final class LyricsViewController: UIViewController {
         artLoadTask?.resume()
     }
 
+    // MARK: - Result application
+
+    private func applyResult(_ result: LyricsResult?) {
+        lyricsResult = result
+        spinner.stopAnimating()
+        offsetControlsView?.isHidden = !isCurrentSong || result?.hasSynced != true
+
+        if result?.hasSynced == true {
+            lyricStatus = .found
+            setupSyncedTable()
+            currentLineIndex = startingIndex(for: initialOffset + lyricOffset)
+            // If viewDidAppear already fired (result arrived late via network),
+            // start interactive elements immediately; otherwise viewDidAppear handles it.
+            if view.window != nil {
+                scrollToCurrentLine(animated: false)
+                if isCurrentSong { startTimer() }
+            }
+        } else if let plain = result?.plain, !plain.isEmpty {
+            lyricStatus = .found
+            setupPlainText(plain)
+        } else {
+            lyricStatus = .notFound
+            setupEmptyState()
+        }
+        updateStatusLabel()
+    }
+
     // MARK: - Synced
 
     private func setupSyncedTable() {
@@ -150,7 +328,7 @@ final class LyricsViewController: UIViewController {
         view.addSubview(lyricsTable)
 
         NSLayoutConstraint.activate([
-            lyricsTable.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 72),
+            lyricsTable.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
             lyricsTable.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             lyricsTable.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             lyricsTable.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -168,7 +346,7 @@ final class LyricsViewController: UIViewController {
         view.addSubview(tv)
 
         NSLayoutConstraint.activate([
-            tv.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 72),
+            tv.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
             tv.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
             tv.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
             tv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -207,19 +385,43 @@ final class LyricsViewController: UIViewController {
 
     private func tick() {
         guard let start = lyricStartDate else { return }
-        let offset = Date().timeIntervalSince(start)
-        let newIndex = startingIndex(for: offset)
-        guard newIndex != currentLineIndex else { return }
+        let offset = Date().timeIntervalSince(start) + lyricOffset
+        let (newIndex, newStatus) = lineState(for: offset)
+        applyLyricState(index: newIndex, status: newStatus)
+    }
+
+    private func lineState(for offset: TimeInterval) -> (index: Int, status: LyricStatus) {
+        let lines = lyricsResult?.lines ?? []
+        guard let first = lines.first, let last = lines.last else {
+            return (0, .found)
+        }
+        let songEnd = lyricsResult?.duration ?? (last.timestamp + Self.lyricEndGrace)
+        if offset < first.timestamp - Self.lyricIntroGrace || offset > songEnd + Self.lyricEndGrace {
+            return (currentLineIndex, .betweenTracks)
+        }
+        var idx = 0
+        for (i, line) in lines.enumerated() where line.timestamp <= offset {
+            idx = i
+        }
+        return (idx, .found)
+    }
+
+    private func applyLyricState(index: Int, status: LyricStatus) {
+        let statusChanged = status != lyricStatus
+        lyricStatus = status
+        if statusChanged {
+            updateStatusLabel()
+        }
+        guard index != currentLineIndex else { return }
         let previous = currentLineIndex
-        currentLineIndex = newIndex
+        currentLineIndex = index
         lyricsTable.reloadRows(at: [IndexPath(row: previous, section: 0),
-                                    IndexPath(row: newIndex, section: 0)], with: .none)
+                                    IndexPath(row: currentLineIndex, section: 0)], with: .none)
         scrollToCurrentLine(animated: true)
     }
 
-    /// Index of the last line whose timestamp <= offset, clamped to bounds.
     private func startingIndex(for offset: TimeInterval) -> Int {
-        let lines = lyricsResult.lines
+        let lines = lyricsResult?.lines ?? []
         guard !lines.isEmpty else { return 0 }
         var idx = 0
         for (i, line) in lines.enumerated() where line.timestamp <= offset {
@@ -229,7 +431,8 @@ final class LyricsViewController: UIViewController {
     }
 
     private func scrollToCurrentLine(animated: Bool) {
-        guard lyricsResult.hasSynced, currentLineIndex < lyricsResult.lines.count else { return }
+        guard lyricsResult?.hasSynced == true,
+              currentLineIndex < (lyricsResult?.lines.count ?? 0) else { return }
         lyricsTable.scrollToRow(at: IndexPath(row: currentLineIndex, section: 0), at: .middle, animated: animated)
     }
 }
@@ -238,12 +441,13 @@ final class LyricsViewController: UIViewController {
 
 extension LyricsViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        lyricsResult.lines.count
+        lyricsResult?.lines.count ?? 0
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: Self.lyricCellID, for: indexPath)
-        let line = lyricsResult.lines[indexPath.row]
+        guard let result = lyricsResult, indexPath.row < result.lines.count else { return cell }
+        let line = result.lines[indexPath.row]
         cell.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
         cell.textLabel?.numberOfLines = 0
         cell.textLabel?.text = line.text

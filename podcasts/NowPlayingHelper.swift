@@ -10,6 +10,16 @@ class NowPlayingHelper {
             return
         }
 
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        // Radio stations: track metadata is owned by setRadioTrackInfo/setArtworkImage.
+        // Only refresh progress — never let the title-mismatch path below overwrite the song title.
+        if PlaybackManager.shared.liveStation(for: episode) != nil {
+            let nowPlayingInfo = NowPlayingHelper.addUpToInformationToNowPlaying(currNowPlaying as [String: AnyObject], duration: duration, upTo: upTo, playbackRate: playbackRate)
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+            return
+        }
+        #endif
+
         let title = NowPlayingHelper.titleForNowPlayingInfo(episode: episode, currentChapters: currentChapters)
         // there's a lot of weird edge case bugs with Apple's now playing implementation, so this method gets called every time progress
         // is saved to the DB, currently every updatesPerSave seconds. it looks at what's in their at the moment, and if it's not the current episode
@@ -85,9 +95,9 @@ class NowPlayingHelper {
     }
     #endif
 
-    /// Update title/artist in MPNowPlayingInfoCenter when ICY/tracklist track changes.
+    /// Update title/artist/album in MPNowPlayingInfoCenter when ICY/tracklist track changes.
     /// Keeps existing fields (artwork, progress) intact.
-    class func setRadioTrackInfo(trackTitle: String, artist: String, stationName: String) {
+    class func setRadioTrackInfo(trackTitle: String, artist: String, album: String?, stationName: String) {
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         if trackTitle.isEmpty {
             info[MPMediaItemPropertyTitle] = stationName as NSString
@@ -96,7 +106,15 @@ class NowPlayingHelper {
             info[MPMediaItemPropertyTitle] = trackTitle as NSString
             info[MPMediaItemPropertyArtist] = artist.isEmpty ? stationName : artist as NSString
         }
-        info[MPMediaItemPropertyAlbumTitle] = stationName as NSString
+        let albumText = album.flatMap { $0.isEmpty ? nil : $0 } ?? stationName
+        info[MPMediaItemPropertyAlbumTitle] = albumText as NSString
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    /// Replace only MPMediaItemPropertyAlbumTitle — used by lyric sync to show current lyric line.
+    class func setRadioAlbumTitle(_ text: String) {
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPMediaItemPropertyAlbumTitle] = text as NSString
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
