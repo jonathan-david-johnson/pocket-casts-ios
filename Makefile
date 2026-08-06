@@ -12,9 +12,12 @@ SIMULATOR_NAME = $(shell xcrun simctl list devices available \
 SIM_UDID = F0042A02-0973-4694-B267-49A1CC21FE19
 SIM_BUNDLE_ID = com.jdj.pocketradio
 
-# Personal-team install on a physical device (free Apple ID, 7-day expiry).
+# Install on a physical device, signed with the paid Apple Developer Program team
+# (X6DVXL53Z3, Individual). The paid team is required for the CarPlay Audio
+# entitlement in podcasts/podcasts*.entitlements — a free personal team cannot
+# provision com.apple.developer.carplay-audio.
 DEVICE_UDID = 8119F0C0-0772-5040-93CA-A592AC45C465
-DEVICE_TEAM_ID = 77WV2LMG2L
+DEVICE_TEAM_ID = X6DVXL53Z3
 DEVICE_BUNDLE_ID_ROOT = com.jdj.pocketradio
 DEVICE_BUNDLE_ID = $(DEVICE_BUNDLE_ID_ROOT)
 
