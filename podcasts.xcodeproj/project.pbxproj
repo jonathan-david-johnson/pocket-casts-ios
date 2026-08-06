@@ -47,6 +47,7 @@
 		10DFE9312C5A889700957D0A /* CategoryPodcastsTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10DFE9302C5A889700957D0A /* CategoryPodcastsTable.swift */; };
 		24DDECA5FD1B45D983FAA12F /* ACRFingerprinter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60D09E3DF5B4D4AABB3E45B /* ACRFingerprinter.swift */; };
 		3371B5B664664A93A92ABABC /* RemoteControlManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E26CBF03954394AE3C86D5 /* RemoteControlManager.swift */; };
+		CC000001000000000000001A /* RemoteDevicePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000001000000000000001B /* RemoteDevicePickerView.swift */; };
 		3FC668C02F7CD3440072EBA8 /* XcodeTarget_podcasts in Frameworks */ = {isa = PBXBuildFile; productRef = 3FC668BF2F7CD3440072EBA8 /* XcodeTarget_podcasts */; };
 		3FC668C22F7CD4A60072EBA8 /* XcodeTarget_NotificationExtension in Frameworks */ = {isa = PBXBuildFile; productRef = 3FC668C12F7CD4A60072EBA8 /* XcodeTarget_NotificationExtension */; };
 		3FC668C42F7CD4F70072EBA8 /* XcodeTarget_Pocket Casts Watch App in Frameworks */ = {isa = PBXBuildFile; productRef = 3FC668C32F7CD4F70072EBA8 /* XcodeTarget_Pocket Casts Watch App */; };
@@ -2770,6 +2771,7 @@
 		F5F884622CC9EAA6002BED2C /* Humane-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Humane-Bold.otf"; sourceTree = "<group>"; };
 		F5FF611F2BD076BA00190711 /* Sharing.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Sharing.xcassets; sourceTree = "<group>"; };
 		F8E26CBF03954394AE3C86D5 /* RemoteControlManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlManager.swift; sourceTree = "<group>"; };
+		CC000001000000000000001B /* RemoteDevicePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteDevicePickerView.swift; sourceTree = "<group>"; };
 		FCCC80722DD56B380080EB2C /* HowToUploadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowToUploadView.swift; sourceTree = "<group>"; };
 		FCE96E132D922FEF00AC50E3 /* HowToShareMenuImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowToShareMenuImageView.swift; sourceTree = "<group>"; };
 		FCE96E152D9230A800AC50E3 /* HowToShareActionImageView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HowToShareActionImageView.swift; sourceTree = "<group>"; };
@@ -3311,6 +3313,7 @@
 			children = (
 				D7196C567E9C4E418D3FB90E /* RemoteCommand.swift */,
 				F8E26CBF03954394AE3C86D5 /* RemoteControlManager.swift */,
+				CC000001000000000000001B /* RemoteDevicePickerView.swift */,
 			);
 			path = RemoteControl;
 			sourceTree = "<group>";
@@ -7234,6 +7237,7 @@
 				4D11D3C82FAFB7780051B62B /* RadioFavoritesManager.swift in Sources */,
 				B86F70433B1D4E968A57AF03 /* RemoteCommand.swift in Sources */,
 				3371B5B664664A93A92ABABC /* RemoteControlManager.swift in Sources */,
+				CC000001000000000000001A /* RemoteDevicePickerView.swift in Sources */,
 				4D11D3CA2FAFB7780051B62B /* FavoritesViewController.swift in Sources */,
 				4D11D3CC2FAFB7780051B62B /* RadioBrowserAPI.swift in Sources */,
 				4D11D3CE2FAFB7780051B62B /* BrowseViewController.swift in Sources */,

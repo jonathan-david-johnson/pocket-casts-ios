@@ -3,6 +3,11 @@ import Supabase
 import UIKit
 import PocketCastsServer
 
+extension Notification.Name {
+    static let remoteControlPresenceChanged = Notification.Name("remoteControlPresenceChanged")
+    static let remoteControlTargetChanged = Notification.Name("remoteControlTargetChanged")
+}
+
 class RemoteControlManager {
     static let shared = RemoteControlManager()
 
@@ -13,6 +18,26 @@ class RemoteControlManager {
     private var listenTask: Task<Void, Never>?
     private var presenceTask: Task<Void, Never>?
     private var loginObserver: NSObjectProtocol?
+
+    // MARK: - Presence & target
+
+    private(set) var presenceList: [String: RemotePresence] = [:]
+    private(set) var activeTargetDeviceId: String?
+
+    var activeTargetName: String? {
+        guard let id = activeTargetDeviceId else { return nil }
+        return presenceList[id]?.deviceName
+    }
+
+    func otherDevices() -> [RemotePresence] {
+        presenceList.values.filter { $0.deviceId != deviceId }.sorted { $0.deviceName < $1.deviceName }
+    }
+
+    func setTarget(_ id: String?) {
+        activeTargetDeviceId = id
+        NotificationCenter.default.post(name: .remoteControlTargetChanged, object: nil)
+        print("🌐 RemoteControl: target set to \(id ?? "nil")")
+    }
 
     func setup() {
         loginObserver = NotificationCenter.default.addObserver(forName: .userSignedIn, object: nil, queue: .main) { [weak self] _ in
@@ -83,11 +108,22 @@ class RemoteControlManager {
         presenceTask = Task { [weak self] in
             guard let self else { return }
             for await action in ch.presenceChange() {
-                let joins = action.joins
-                let leaves = action.leaves
-                print("🌐 RemoteControl: presence_diff joins=\(joins.count) leaves=\(leaves.count)")
-                for key in joins.keys { print("🌐 RemoteControl:   join device=\(key)") }
-                for key in leaves.keys { print("🌐 RemoteControl:   leave device=\(key)") }
+                for (key, presenceV2) in action.joins {
+                    if let data = try? JSONEncoder().encode(presenceV2.state),
+                       let presence = try? JSONDecoder().decode(RemotePresence.self, from: data) {
+                        self.presenceList[key] = presence
+                        print("🌐 RemoteControl:   join device=\(key) name=\(presence.deviceName)")
+                    }
+                }
+                for key in action.leaves.keys {
+                    self.presenceList.removeValue(forKey: key)
+                    if self.activeTargetDeviceId == key {
+                        self.setTarget(nil)
+                    }
+                    print("🌐 RemoteControl:   leave device=\(key)")
+                }
+                print("🌐 RemoteControl: presence_diff joins=\(action.joins.count) leaves=\(action.leaves.count) total=\(self.presenceList.count)")
+                NotificationCenter.default.post(name: .remoteControlPresenceChanged, object: nil)
             }
         }
 
@@ -192,20 +228,51 @@ class RemoteControlManager {
         print("🌐 RemoteControl: received command=\(cmd.command) from=\(cmd.fromDeviceId) id=\(cmd.commandId)")
     }
 
+    // MARK: - Remote routing
+
+    func sendLoadStationNow() {
+        sendLoadStationIfTargeted()
+    }
+
+    private func sendLoadStationIfTargeted() {
+        guard let targetId = activeTargetDeviceId else { return }
+        guard let station = PlaybackManager.shared.currentEpisode() as? RadioStation else { return }
+        send(command: "load_station", to: targetId, payload: RemoteCommandPayload(
+            stationId: station.uuid,
+            stationUrl: station.streamUrl,
+            stationName: station.title
+        ))
+    }
+
+    private func sendPlayPauseIfTargeted(playing: Bool) {
+        guard let targetId = activeTargetDeviceId else { return }
+        guard PlaybackManager.shared.currentEpisode() is RadioStation else { return }
+        send(command: playing ? "play" : "pause", to: targetId)
+    }
+
+    // MARK: - Playback observers
+
     private var playbackObservers: [NSObjectProtocol] = []
 
     private func observePlaybackNotifications() {
         let center = NotificationCenter.default
-        let notifications: [Notification.Name] = [
-            Constants.Notifications.playbackStarted,
-            Constants.Notifications.playbackPaused,
-            Constants.Notifications.playbackTrackChanged
-        ]
-        playbackObservers = notifications.map { name in
+        let add: (Notification.Name, @escaping () -> Void) -> NSObjectProtocol = { name, block in
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 self?.updatePresence()
+                block()
             }
         }
+        playbackObservers = [
+            add(Constants.Notifications.playbackStarted) { [weak self] in
+                self?.sendLoadStationIfTargeted()
+            },
+            add(Constants.Notifications.playbackPaused) { [weak self] in
+                self?.sendPlayPauseIfTargeted(playing: false)
+            },
+            add(Constants.Notifications.playbackTrackChanged) { [weak self] in
+                self?.sendLoadStationIfTargeted()
+            }
+        ]
     }
 
     private func removePlaybackObservers() {

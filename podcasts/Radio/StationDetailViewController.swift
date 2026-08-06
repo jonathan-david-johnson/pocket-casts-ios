@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 
 class StationDetailViewController: SimpleNotificationsViewController {
@@ -112,6 +113,20 @@ class StationDetailViewController: SimpleNotificationsViewController {
     private var fingerprinter: ACRFingerprinter?
     private var isIdentifying = false
 
+    // MARK: - Remote control
+
+    private let remoteIndicatorLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 13)
+        l.textColor = AppTheme.colorForStyle(.primaryInteractive01)
+        l.textAlignment = .center
+        l.isHidden = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private var remoteObservers: [NSObjectProtocol] = []
+
     private lazy var identifyButton: UIButton = {
         var config = UIButton.Configuration.tinted()
         config.image = UIImage(systemName: "music.note.list")
@@ -166,6 +181,8 @@ class StationDetailViewController: SimpleNotificationsViewController {
         addCustomObserver(Constants.Notifications.playbackPaused, selector: #selector(playbackChanged))
         addCustomObserver(Constants.Notifications.playbackEnded, selector: #selector(playbackChanged))
 
+        setupRemoteControl()
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleNowPlayingChange(_:)),
@@ -214,6 +231,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
             pendingTracklistTask?.cancel()
             pendingTracklistTask = nil
         }
+        remoteObservers.forEach { NotificationCenter.default.removeObserver($0) }
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -247,7 +265,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         buttonStack.distribution = .equalSpacing
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, nowPlayingTitleLabel, nowPlayingArtistLabel, buttonStack])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, nowPlayingTitleLabel, nowPlayingArtistLabel, remoteIndicatorLabel, buttonStack])
         mainStack.axis = .vertical
         mainStack.spacing = 12
         mainStack.alignment = .center
@@ -273,6 +291,68 @@ class StationDetailViewController: SimpleNotificationsViewController {
             tracklistTable.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
             tracklistTable.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
+    }
+
+    // MARK: - Remote control
+
+    private func setupRemoteControl() {
+        updateCastButton()
+        updateRemoteIndicator()
+        let center = NotificationCenter.default
+        remoteObservers = [
+            center.addObserver(forName: .remoteControlPresenceChanged, object: nil, queue: .main) { [weak self] _ in
+                self?.updateCastButton()
+            },
+            center.addObserver(forName: .remoteControlTargetChanged, object: nil, queue: .main) { [weak self] _ in
+                self?.updateCastButton()
+                self?.updateRemoteIndicator()
+            }
+        ]
+    }
+
+    private func updateCastButton() {
+        let mgr = RemoteControlManager.shared
+        let isTargeting = mgr.activeTargetDeviceId != nil
+        let imageName = isTargeting ? "airplayvideo.badge.plus" : "airplayvideo"
+        let item = UIBarButtonItem(
+            image: UIImage(systemName: imageName),
+            style: .plain,
+            target: self,
+            action: #selector(castTapped)
+        )
+        item.tintColor = isTargeting ? AppTheme.colorForStyle(.primaryInteractive01) : AppTheme.colorForStyle(.primaryIcon01)
+        navigationItem.rightBarButtonItem = item
+    }
+
+    @objc private func castTapped() {
+        let mgr = RemoteControlManager.shared
+        let picker = RemoteDevicePickerView(
+            devices: mgr.otherDevices(),
+            currentTargetId: mgr.activeTargetDeviceId
+        ) { [weak self] selectedId in
+            let mgr = RemoteControlManager.shared
+            mgr.setTarget(selectedId)
+            self?.updateRemoteIndicator()
+            if selectedId != nil {
+                mgr.sendLoadStationNow()
+            }
+        }
+        let host = UIHostingController(rootView: picker)
+        host.modalPresentationStyle = .pageSheet
+        if let sheet = host.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(host, animated: true)
+    }
+
+    private func updateRemoteIndicator() {
+        if let name = RemoteControlManager.shared.activeTargetName {
+            remoteIndicatorLabel.text = "▶ Playing on \(name)"
+            remoteIndicatorLabel.isHidden = false
+        } else {
+            remoteIndicatorLabel.isHidden = true
+        }
     }
 
     @objc private func playbackChanged() {
