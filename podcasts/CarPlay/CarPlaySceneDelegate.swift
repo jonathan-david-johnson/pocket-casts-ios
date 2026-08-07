@@ -12,6 +12,12 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
     var debouncer: Debounce = .init(delay: 0.2)
     weak var visibleTemplate: CPTemplate?
 
+    // Radio favorite state for the currently-playing station. Resolved async
+    // (RadioFavoritesManager hits Supabase) so it's tracked here rather than
+    // read synchronously in updateNowPlayingButtons.
+    private var currentStationIsFavorite = false
+    private var favoriteStateTask: Task<Void, Never>?
+
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene, didConnect interfaceController: CPInterfaceController) {
         FileLog.shared.addMessage("CarPlay: didConnect")
 
@@ -96,9 +102,34 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
 
             let nowPlayingTemplate = CPNowPlayingTemplate.shared
             self.updateNowPlayingButtons(template: nowPlayingTemplate)
+            self.refreshFavoriteState()
 
             // Also update the episode list if needed, this makes sure its updated when the episode ends
             self.handleDataUpdated()
+        }
+    }
+
+    /// Resolves favorite state for the current station and, if it changed,
+    /// rebuilds the buttons. `RadioFavoritesManager.isFavorite` is async
+    /// (Supabase); the main thread can't await it inside updateNowPlayingButtons.
+    private func refreshFavoriteState() {
+        favoriteStateTask?.cancel()
+
+        guard let station = PlaybackManager.shared.liveStation(for: nil) else {
+            currentStationIsFavorite = false
+            return
+        }
+
+        favoriteStateTask = Task { [weak self] in
+            guard let self else { return }
+            let isFavorite = (try? await RadioFavoritesManager.shared.isFavorite(stationId: station.uuid)) ?? false
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard self.currentStationIsFavorite != isFavorite else { return }
+                self.currentStationIsFavorite = isFavorite
+                self.updateNowPlayingButtons(template: CPNowPlayingTemplate.shared)
+            }
         }
     }
 
@@ -117,52 +148,71 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
 
     private func setupNowPlaying() {
         let nowPlayingTemplate = CPNowPlayingTemplate.shared
-        nowPlayingTemplate.isUpNextButtonEnabled = true
-        nowPlayingTemplate.isAlbumArtistButtonEnabled = true
         nowPlayingTemplate.add(self)
 
+        refreshFavoriteState()
         updateNowPlayingButtons(template: nowPlayingTemplate)
     }
 
     private func updateNowPlayingButtons(template: CPNowPlayingTemplate) {
-        var buttons = [CPNowPlayingButton]()
+        let isLiveRadio = PlaybackManager.shared.isLiveStream()
+        let episode = PlaybackManager.shared.currentEpisode() as? Episode
 
-        if let image = UIImage(named: "car_markasplayed") {
-            let markPlayedBtn = CPNowPlayingImageButton(image: image) { _ in
-                guard let episode = PlaybackManager.shared.currentEpisode() else { return }
-                AnalyticsEpisodeHelper.shared.currentSource = .carPlay
+        let kinds = CarPlayNowPlayingButtonSet.buttons(
+            isLiveRadio: isLiveRadio,
+            canMute: PlaybackManager.shared.shouldUseMuteControls(),
+            isMuted: PlaybackManager.shared.isMuted,
+            isFavorite: currentStationIsFavorite,
+            chapterCount: PlaybackManager.shared.chapterCount(),
+            isStarred: episode?.keepEpisode == true
+        )
 
-                EpisodeManager.markAsPlayed(episode: episode, fireNotification: true)
+        template.isUpNextButtonEnabled = CarPlayNowPlayingButtonSet.showsUpNextButton(isLiveRadio: isLiveRadio)
+        template.isAlbumArtistButtonEnabled = CarPlayNowPlayingButtonSet.showsAlbumArtistButton(isLiveRadio: isLiveRadio)
+
+        let buttons = kinds.compactMap { kind -> CPNowPlayingButton? in
+            switch kind {
+            case .markAsPlayed:
+                return markAsPlayedButton()
+            case .playbackRate:
+                return CPNowPlayingPlaybackRateButton { [weak self] _ in
+                    self?.speedTapped()
+                }
+            case .chapters:
+                return chaptersButton()
+            case .star(let filled):
+                return starButton(filled: filled, episode: episode)
+            case .mute(let muted):
+                return muteButton(muted: muted)
+            case .favorite(let isFavorite):
+                return favoriteButton(isFavorite: isFavorite)
             }
-            buttons.append(markPlayedBtn)
-        }
-
-        let rateButton = CPNowPlayingPlaybackRateButton { [weak self] _ in
-            self?.speedTapped()
-        }
-
-        buttons.append(rateButton)
-
-        // show the chapter picker if there are chapters
-        if PlaybackManager.shared.chapterCount() > 0, let chapterImage = UIImage(named: "car_chapters") {
-            let chapterButton = CPNowPlayingImageButton(image: chapterImage) { [weak self] _ in
-                self?.chaptersTapped()
-            }
-
-            buttons.append(chapterButton)
-        }
-
-        if let starButton = starButton() {
-            buttons.append(starButton)
         }
 
         template.updateNowPlayingButtons(buttons)
     }
 
-    private func starButton() -> CPNowPlayingImageButton? {
-        let episode = PlaybackManager.shared.currentEpisode() as? Episode
+    private func markAsPlayedButton() -> CPNowPlayingImageButton? {
+        guard let image = UIImage(named: "car_markasplayed") else { return nil }
 
-        let starImageName = episode?.keepEpisode == true ? "star_filled" : "star_empty"
+        return CPNowPlayingImageButton(image: image) { _ in
+            guard let episode = PlaybackManager.shared.currentEpisode() else { return }
+            AnalyticsEpisodeHelper.shared.currentSource = .carPlay
+
+            EpisodeManager.markAsPlayed(episode: episode, fireNotification: true)
+        }
+    }
+
+    private func chaptersButton() -> CPNowPlayingImageButton? {
+        guard let chapterImage = UIImage(named: "car_chapters") else { return nil }
+
+        return CPNowPlayingImageButton(image: chapterImage) { [weak self] _ in
+            self?.chaptersTapped()
+        }
+    }
+
+    private func starButton(filled: Bool, episode: Episode?) -> CPNowPlayingImageButton? {
+        let starImageName = filled ? "star_filled" : "star_empty"
 
         // Should never happen
         guard let image = UIImage(named: starImageName) else { return nil }
@@ -179,6 +229,49 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
         starButton.isEnabled = episode != nil
 
         return starButton
+    }
+
+    private func muteButton(muted: Bool) -> CPNowPlayingImageButton? {
+        let imageName = muted ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        guard let image = UIImage(systemName: imageName) else { return nil }
+
+        return CPNowPlayingImageButton(image: image) { _ in
+            PlaybackManager.shared.toggleMute()
+        }
+    }
+
+    private func favoriteButton(isFavorite: Bool) -> CPNowPlayingImageButton? {
+        let imageName = isFavorite ? "heart.fill" : "heart"
+        guard let image = UIImage(systemName: imageName) else { return nil }
+
+        return CPNowPlayingImageButton(image: image) { [weak self] _ in
+            self?.toggleFavorite(currentlyFavorite: isFavorite)
+        }
+    }
+
+    private func toggleFavorite(currentlyFavorite: Bool) {
+        guard let station = PlaybackManager.shared.liveStation(for: nil) else { return }
+
+        // Optimistic flip, reconciled when the network call returns.
+        currentStationIsFavorite = !currentlyFavorite
+        updateNowPlayingButtons(template: CPNowPlayingTemplate.shared)
+
+        Task { [weak self] in
+            do {
+                if currentlyFavorite {
+                    try await RadioFavoritesManager.shared.removeFavorite(stationId: station.uuid)
+                } else {
+                    try await RadioFavoritesManager.shared.addFavorite(stationId: station.uuid)
+                }
+            } catch {
+                FileLog.shared.addMessage("CarPlay: favorite toggle failed for \(station.uuid): \(error)")
+                await MainActor.run {
+                    guard let self else { return }
+                    self.currentStationIsFavorite = currentlyFavorite
+                    self.updateNowPlayingButtons(template: CPNowPlayingTemplate.shared)
+                }
+            }
+        }
     }
 
     // MARK: - CPNowPlayingTemplateObserver
