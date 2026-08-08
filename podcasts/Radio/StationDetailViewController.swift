@@ -491,8 +491,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
         if isCurrentStation && PlaybackManager.shared.playing() {
             PlaybackManager.shared.pause()
         } else {
-            RadioStationRegistry.shared.register(station)
-            PlaybackManager.shared.load(episode: station, autoPlay: true, overrideUpNext: false)
+            RadioPlaybackStarter.shared.reload(station: station, source: .player, prefetchTracklist: false, republishWidgetState: false)
         }
         updatePlayButton()
     }
