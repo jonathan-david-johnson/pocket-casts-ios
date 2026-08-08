@@ -1,5 +1,6 @@
 import CarPlay
 import Foundation
+import MediaPlayer
 import PocketCastsDataModel
 import PocketCastsServer
 import UIKit
@@ -18,8 +19,20 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
     private var currentStationIsFavorite = false
     private var favoriteStateTask: Task<Void, Never>?
 
+    /// Whether a CarPlay interface controller is currently connected. Other
+    /// components (e.g. `NowPlayingHelper`) read this to suppress
+    /// CarPlay-inappropriate `MPNowPlayingInfoCenter` writes.
+    static private(set) var isConnected = false
+
+    /// Test-only seam — drives `isConnected` without a real CarPlay scene.
+    static func setConnectedForTesting(_ value: Bool) {
+        isConnected = value
+    }
+
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene, didConnect interfaceController: CPInterfaceController) {
         FileLog.shared.addMessage("CarPlay: didConnect")
+
+        Self.isConnected = true
 
         self.interfaceController = interfaceController
         interfaceController.delegate = self
@@ -37,7 +50,28 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
         self.interfaceController?.delegate = nil
         self.interfaceController = nil
 
+        Self.isConnected = false
+
         CPNowPlayingTemplate.shared.remove(self)
+
+        // The album field may still hold a lyric line written by
+        // StationDetailViewController while CarPlay was suppressing it (D9).
+        // Restore the real track album now that suppression no longer applies.
+        // Title/artist are untouched by the lyric writer, so read them back
+        // from the current info dict rather than re-deriving them.
+        if let station = PlaybackManager.shared.liveStation(for: nil) {
+            let info = MPNowPlayingInfoCenter.default().nowPlayingInfo
+            let title = (info?[MPMediaItemPropertyTitle] as? String) ?? ""
+            let artist = (info?[MPMediaItemPropertyArtist] as? String) ?? ""
+            let album = RadioTracklistService.shared.cached(stationId: station.uuid)?.first?.album
+
+            NowPlayingHelper.setRadioTrackInfo(
+                trackTitle: title,
+                artist: artist,
+                album: album,
+                stationName: station.displayableTitle()
+            )
+        }
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {

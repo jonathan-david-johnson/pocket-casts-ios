@@ -112,7 +112,13 @@ class NowPlayingHelper {
     }
 
     /// Replace only MPMediaItemPropertyAlbumTitle — used by lyric sync to show current lyric line.
+    /// Suppressed while CarPlay is connected (D9): the same info center feeds the
+    /// car's Now Playing screen, and lyric lines have no business on the album field there.
     class func setRadioAlbumTitle(_ text: String) {
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        if CarPlaySceneDelegate.isConnected { return }
+        #endif
+
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         info[MPMediaItemPropertyAlbumTitle] = text as NSString
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
