@@ -516,6 +516,14 @@ internal enum L10n {
   internal static var carplayMore: String { return L10n.tr("Localizable", "carplay_more", fallback: "More") }
   /// CarPlay option to modify the playback speed.
   internal static var carplayPlaybackSpeed: String { return L10n.tr("Localizable", "carplay_playback_speed", fallback: "Playback Speed") }
+  /// CarPlay — shown when the radio tab has no stations to display
+  internal static var carplayRadioEmpty: String { return L10n.tr("Localizable", "carplay_radio_empty", fallback: "No stations available") }
+  /// CarPlay — section header above the user's favorite radio stations
+  internal static var carplayRadioFavorites: String { return L10n.tr("Localizable", "carplay_radio_favorites", fallback: "Favorites") }
+  /// CarPlay — section header above the curated built-in radio stations
+  internal static var carplayRadioStations: String { return L10n.tr("Localizable", "carplay_radio_stations", fallback: "Stations") }
+  /// CarPlay — title of the Radio tab in the CarPlay tab bar
+  internal static var carplayRadioTab: String { return L10n.tr("Localizable", "carplay_radio_tab", fallback: "Radio") }
   /// CarPlay prompt to navigate to the up next Queue.
   internal static var carplayUpNextQueue: String { return L10n.tr("Localizable", "carplay_up_next_queue", fallback: "Up Next Queue") }
   /// Subtitle of the Pocket Casts champion screen

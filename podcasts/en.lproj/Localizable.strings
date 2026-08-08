@@ -319,6 +319,18 @@
 /* CarPlay option to modify the playback speed. */
 "carplay_playback_speed" = "Playback Speed";
 
+/* CarPlay — title of the Radio tab in the CarPlay tab bar */
+"carplay_radio_tab" = "Radio";
+
+/* CarPlay — section header above the user's favorite radio stations */
+"carplay_radio_favorites" = "Favorites";
+
+/* CarPlay — section header above the curated built-in radio stations */
+"carplay_radio_stations" = "Stations";
+
+/* CarPlay — shown when the radio tab has no stations to display */
+"carplay_radio_empty" = "No stations available";
+
 /* CarPlay prompt to navigate to the up next Queue. */
 "carplay_up_next_queue" = "Up Next Queue";
 
