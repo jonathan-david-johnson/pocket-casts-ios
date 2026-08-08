@@ -37,7 +37,10 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
         self.interfaceController = interfaceController
         interfaceController.delegate = self
 
-        let tabTemplate = CPTabBarTemplate(templates: [createPodcastsTab(), createFiltersTab(), createDownloadsTab(), createMoreTab()])
+        // Exactly 5 templates — CarPlay's hard cap. A 6th is silently truncated,
+        // so anything added here has to displace something. More stays last:
+        // it's the catch-all.
+        let tabTemplate = CPTabBarTemplate(templates: [createPodcastsTab(), createFiltersTab(), createDownloadsTab(), createRadioTab(), createMoreTab()])
         interfaceController.setRootTemplate(tabTemplate)
 
         self.visibleTemplate = tabTemplate.selectedTemplate
@@ -66,6 +69,7 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
             let album = RadioTracklistService.shared.cached(stationId: station.uuid)?.first?.album
 
             NowPlayingHelper.setRadioTrackInfo(
+                stationId: station.uuid,
                 trackTitle: title,
                 artist: artist,
                 album: album,
@@ -111,6 +115,9 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
             Constants.Notifications.userEpisodeUpdated,
             Constants.Notifications.userEpisodeDeleted,
             ServerNotifications.userEpisodesRefreshed,
+
+            // Radio
+            .radioFavoritesChanged,
         ]
 
         for notification in notifications {
@@ -122,7 +129,10 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
             Constants.Notifications.playbackEnded,
             Constants.Notifications.podcastChaptersDidUpdate,
             Constants.Notifications.playbackStarted,
-            Constants.Notifications.episodeStarredChanged
+            Constants.Notifications.episodeStarredChanged,
+
+            // Keeps the mute button in sync when muted from the phone or lock screen
+            Constants.Notifications.playbackMuteChanged
         ]
 
         for notification in playbackNotifications {

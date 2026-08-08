@@ -110,8 +110,14 @@ final class RadioFavoritesService {
             ))
         }
 
+        // Post only on a genuine change. CarPlay's data source kicks a resolve on
+        // every reload and reloads on `.radioFavoritesChanged` — an unconditional
+        // post would make those two chase each other forever.
+        let changed = rows != cache.snapshot()
         cache.write(rows)
-        NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
+        if changed {
+            NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
+        }
         return rows
     }
 

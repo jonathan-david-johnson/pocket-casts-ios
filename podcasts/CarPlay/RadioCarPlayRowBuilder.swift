@@ -2,6 +2,8 @@ import Foundation
 
 /// One row in the CarPlay Radio tab, independent of CarPlay types.
 struct RadioCarPlayRow: Equatable {
+    /// Always a radio-browser UUID — for curated rows this is the station's
+    /// `defaultSeedUUID`, not its slug `id`.
     let stationId: String
     let title: String
     let detail: String?         // city/country, nil when unknown
@@ -50,15 +52,19 @@ enum RadioCarPlayRowBuilder {
             sections.append(RadioCarPlaySection(header: L10n.carplayRadioFavorites, rows: Array(rows)))
         }
 
+        // `CuratedStation.id` is a human slug ("kexp"); the identity every other
+        // radio surface uses — `RadioStation.uuid`, the registry, radio-browser
+        // by-uuid lookup — is the radio-browser UUID. Emit the seed UUID so both
+        // the now-playing comparison below and M11.6's async resolve can match.
         let curatedRows = curated.prefix(maxRowsPerSection).map { station in
             RadioCarPlayRow(
-                stationId: station.id,
+                stationId: station.defaultSeedUUID,
                 title: station.name,
                 detail: station.description,
                 logoAsset: station.logoAsset,
                 faviconUrl: nil,
                 streamUrl: "",
-                isPlaying: station.id == nowPlayingStationId
+                isPlaying: station.defaultSeedUUID == nowPlayingStationId
             )
         }
         sections.append(RadioCarPlaySection(header: L10n.carplayRadioStations, rows: Array(curatedRows)))

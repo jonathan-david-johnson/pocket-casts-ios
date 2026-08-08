@@ -26,7 +26,8 @@ class RadioCarPlayRowBuilderTests: XCTestCase {
         id: String = "curated-1",
         name: String = "Curated Station",
         description: String? = "A curated description",
-        logoAsset: String? = "curated-logo"
+        logoAsset: String? = "curated-logo",
+        seedUUID: String = "uuid-1"
     ) -> CuratedStation {
         CuratedStation(
             id: id,
@@ -34,8 +35,8 @@ class RadioCarPlayRowBuilderTests: XCTestCase {
             description: description,
             logoAsset: logoAsset,
             tracklistUrl: nil,
-            radioBrowserUUIDs: ["uuid-1"],
-            defaultSeedUUID: "uuid-1",
+            radioBrowserUUIDs: [seedUUID],
+            defaultSeedUUID: seedUUID,
             seedAsFavorite: nil
         )
     }
@@ -98,7 +99,7 @@ class RadioCarPlayRowBuilderTests: XCTestCase {
         let sharedId = "shared-station"
         let sections = RadioCarPlayRowBuilder.sections(
             favorites: [favorite(stationId: sharedId)],
-            curated: [curated(id: sharedId)],
+            curated: [curated(id: "curated-slug", seedUUID: sharedId)],
             isSignedIn: true,
             nowPlayingStationId: nil,
             maxRowsPerSection: 100
@@ -113,7 +114,7 @@ class RadioCarPlayRowBuilderTests: XCTestCase {
         let sharedId = "shared-station"
         let sections = RadioCarPlayRowBuilder.sections(
             favorites: [favorite(stationId: sharedId)],
-            curated: [curated(id: sharedId)],
+            curated: [curated(id: "curated-slug", seedUUID: sharedId)],
             isSignedIn: true,
             nowPlayingStationId: sharedId,
             maxRowsPerSection: 100
@@ -189,6 +190,21 @@ class RadioCarPlayRowBuilderTests: XCTestCase {
         let row = sections[0].rows[0]
         XCTAssertEqual(row.streamUrl, "")
         XCTAssertNil(row.faviconUrl)
+    }
+
+    /// Curated rows must carry the radio-browser UUID, never the slug `id` —
+    /// `RadioPlaybackStarter.play(stationId:)` resolves by UUID, and
+    /// `RadioStation.uuid` (what `isPlaying` compares against) is a UUID too.
+    func testCuratedRowUsesSeedUUIDNotSlug() {
+        let sections = RadioCarPlayRowBuilder.sections(
+            favorites: [],
+            curated: [curated(id: "kexp", seedUUID: "445cbb3a-1c4e-49aa-a268-f5b6acfa8f2e")],
+            isSignedIn: false,
+            nowPlayingStationId: nil,
+            maxRowsPerSection: 100
+        )
+
+        XCTAssertEqual(sections[0].rows[0].stationId, "445cbb3a-1c4e-49aa-a268-f5b6acfa8f2e")
     }
 
     func testCuratedDetailUsesDescription() {

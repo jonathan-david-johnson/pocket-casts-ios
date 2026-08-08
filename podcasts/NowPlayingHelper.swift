@@ -13,8 +13,13 @@ class NowPlayingHelper {
         #if !os(watchOS) && !APPCLIP && !os(tvOS)
         // Radio stations: track metadata is owned by setRadioTrackInfo/setArtworkImage.
         // Only refresh progress — never let the title-mismatch path below overwrite the song title.
-        if PlaybackManager.shared.liveStation(for: episode) != nil {
-            let nowPlayingInfo = NowPlayingHelper.addUpToInformationToNowPlaying(currNowPlaying as [String: AnyObject], duration: duration, upTo: upTo, playbackRate: playbackRate)
+        if let radio = PlaybackManager.shared.liveStation(for: episode) {
+            var nowPlayingInfo = NowPlayingHelper.addUpToInformationToNowPlaying(currNowPlaying as [String: AnyObject], duration: duration, upTo: upTo, playbackRate: playbackRate)
+            // This path inherits whatever is already in the info center, which
+            // before the first radio-aware write is the generic dict — artist
+            // "PocketCasts". Run the same fallback used on the rebuild path.
+            carryOverRadioTrackInfo(into: &nowPlayingInfo, station: radio)
+            applyLiveStreamMarkers(to: &nowPlayingInfo)
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
             return
         }
@@ -45,6 +50,17 @@ class NowPlayingHelper {
         // baseline artwork, and let RadioArtworkCoordinator overwrite it with
         // per-track art when a tracklist tick resolves one.
         if let radio = PlaybackManager.shared.liveStation(for: episode) {
+            // Track title/artist/album for a live station are owned by
+            // `setRadioTrackInfo`. This method also runs off plain playback-state
+            // notifications (`PlaybackManager.updateAllNowPlayingData`), and the
+            // dict it builds carries the *station* name as the title and
+            // "PocketCasts" as the artist. Without this carry-over, every
+            // play/pause would blow away the song — and `RadioMetadataObserver`
+            // dedupes consecutive ICY frames, so nothing would restore it until
+            // the next song change.
+            carryOverRadioTrackInfo(into: &nowPlayingInfoWithProgress, station: radio)
+            applyLiveStreamMarkers(to: &nowPlayingInfoWithProgress)
+
             let stationLogo = stationLogoImage(for: radio)
             let imageToUse = stationLogo ?? UIImage(named: "noartwork-page")!
             let artwork = MPMediaItemArtwork(boundsSize: CGSize(width: size, height: size), requestHandler: { _ -> UIImage in
@@ -95,19 +111,87 @@ class NowPlayingHelper {
     }
     #endif
 
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
+    /// The station whose track metadata currently sits in the info center, so a
+    /// rebuild can tell "same station, keep the song" from "switched stations,
+    /// the old song is stale".
+    private static var radioTrackStationId: String?
+
+    /// Declare a live radio stream as what it is.
+    ///
+    /// Without `IsLiveStream` the system assumes a seekable item and reserves
+    /// space for a scrubber it can never draw (`duration` is 0), which is what
+    /// squeezes CarPlay's title/artist/album stack until the lines collide.
+    /// The media type also moves off `.podcast` — a car head unit lays out a
+    /// music item as title/artist/album, which is exactly the shape radio has.
+    private class func applyLiveStreamMarkers(to info: inout [String: AnyObject]) {
+        info[MPNowPlayingInfoPropertyIsLiveStream] = NSNumber(value: true)
+        info[MPMediaItemPropertyMediaType] = NSNumber(value: MPMediaType.music.rawValue)
+        info[MPNowPlayingInfoPropertyMediaType] = NSNumber(value: MPNowPlayingInfoMediaType.audio.rawValue)
+
+        // Zero duration, not a missing one: `IsLiveStream` already tells the UI to
+        // show LIVE instead of a scrubber, and removing the key entirely takes
+        // elapsed/rate out of the picture too — which is what the transport reads
+        // to decide play vs pause.
+        info[MPMediaItemPropertyPlaybackDuration] = NSNumber(value: 0)
+        info.removeValue(forKey: MPMediaItemPropertyBookmarkTime)
+        info.removeValue(forKey: MPMediaItemPropertyGenre)
+
+        // Every radio write goes through here, including track changes mid-song.
+        // Restate the rate from real playback state so a metadata refresh can
+        // never leave the button showing Play while audio is running.
+        info[MPNowPlayingInfoPropertyPlaybackRate] = NSNumber(value: PlaybackManager.shared.playing() ? 1.0 : 0.0)
+    }
+
+    /// Preserve song title/artist/album across a full info-dict rebuild, but only
+    /// while the station is unchanged. When there is no song yet, fall back to the
+    /// station name for artist and album — the generic dict says "PocketCasts",
+    /// which is wrong on a car head unit.
+    private class func carryOverRadioTrackInfo(into info: inout [String: AnyObject], station: RadioStation) {
+        let stationName = station.displayableTitle()
+
+        guard radioTrackStationId == station.uuid,
+              let existing = MPNowPlayingInfoCenter.default().nowPlayingInfo,
+              let title = existing[MPMediaItemPropertyTitle] as? String, !title.isEmpty else {
+            info[MPMediaItemPropertyArtist] = stationName as NSString
+            info[MPMediaItemPropertyAlbumTitle] = stationName as NSString
+            info[MPMediaItemPropertyComposer] = stationName as NSString
+            return
+        }
+
+        info[MPMediaItemPropertyTitle] = title as NSString
+        for key in [MPMediaItemPropertyArtist, MPMediaItemPropertyAlbumTitle] {
+            let value = (existing[key] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? stationName
+            info[key] = value as NSString
+        }
+    }
+    #endif
+
     /// Update title/artist/album in MPNowPlayingInfoCenter when ICY/tracklist track changes.
     /// Keeps existing fields (artwork, progress) intact.
-    class func setRadioTrackInfo(trackTitle: String, artist: String, album: String?, stationName: String) {
-        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+    ///
+    /// Field mapping is deliberate: `Title` is the song, `Artist` the performer,
+    /// `AlbumTitle` the album. The station name is only used to fill a field the
+    /// stream didn't supply — the third line is narrow, and an album name losing
+    /// characters to a station suffix the driver already knows is a bad trade.
+    class func setRadioTrackInfo(stationId: String, trackTitle: String, artist: String, album: String?, stationName: String) {
+        var info = (MPNowPlayingInfoCenter.default().nowPlayingInfo as? [String: AnyObject]) ?? [:]
         if trackTitle.isEmpty {
             info[MPMediaItemPropertyTitle] = stationName as NSString
             info[MPMediaItemPropertyArtist] = stationName as NSString
         } else {
             info[MPMediaItemPropertyTitle] = trackTitle as NSString
-            info[MPMediaItemPropertyArtist] = artist.isEmpty ? stationName : artist as NSString
+            info[MPMediaItemPropertyArtist] = (artist.isEmpty ? stationName : artist) as NSString
         }
-        let albumText = album.flatMap { $0.isEmpty ? nil : $0 } ?? stationName
-        info[MPMediaItemPropertyAlbumTitle] = albumText as NSString
+
+        let albumName = album.flatMap { $0.isEmpty ? nil : $0 }
+        info[MPMediaItemPropertyAlbumTitle] = (albumName ?? stationName) as NSString
+
+        #if !os(watchOS) && !APPCLIP && !os(tvOS)
+        radioTrackStationId = stationId
+        applyLiveStreamMarkers(to: &info)
+        #endif
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 

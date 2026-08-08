@@ -464,6 +464,7 @@ class StationDetailViewController: SimpleNotificationsViewController {
                lyricSync.songKey(for: newTop) != previousTopKey,
                PlaybackManager.shared.currentEpisode()?.uuid == station.uuid {
                 NowPlayingHelper.setRadioTrackInfo(
+                    stationId: station.uuid,
                     trackTitle: newTop.title,
                     artist: newTop.artist,
                     album: newTop.album,

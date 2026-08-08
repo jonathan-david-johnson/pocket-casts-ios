@@ -432,14 +432,20 @@ class PlaybackManager: ServerPlaybackDelegate {
               let stationId = info[RadioMetadataNotificationKey.stationId] as? String else { return }
         let title = (info[RadioMetadataNotificationKey.title] as? String) ?? ""
         let artist = (info[RadioMetadataNotificationKey.artist] as? String) ?? ""
+        let icyAlbum = info[RadioMetadataNotificationKey.album] as? String
         if let station = RadioStationRegistry.shared.station(for: stationId),
            currentEpisode()?.uuid == stationId {
             let stationName = station.displayableTitle()
             let tracklistEntry = RadioTracklistService.shared.cached(stationId: stationId)?.first
+
+            // The ICY frame is the freshest source and, once parsed, already
+            // carries artist and album. The cached tracklist only fills gaps —
+            // it can lag the stream by a song, so it never overrides a field ICY
+            // supplied.
             let resolvedArtist = artist.isEmpty ? (tracklistEntry?.artist ?? "") : artist
-            let album = tracklistEntry?.album
+            let album = icyAlbum ?? tracklistEntry?.album
             DispatchQueue.main.async {
-                NowPlayingHelper.setRadioTrackInfo(trackTitle: title, artist: resolvedArtist, album: album, stationName: stationName)
+                NowPlayingHelper.setRadioTrackInfo(stationId: stationId, trackTitle: title, artist: resolvedArtist, album: album, stationName: stationName)
             }
         }
         resolveRadioArtworkForLockScreen(stationId: stationId, icyArtist: artist, icyTitle: title)
