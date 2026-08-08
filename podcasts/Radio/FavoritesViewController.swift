@@ -1,56 +1,10 @@
 import UIKit
 import PocketCastsServer
 
-private struct FavoriteRow {
-    let stationId: String
-    var browse: RadioBrowserStation?
-
-    var displayName: String {
-        CuratedStationsLoader.enhancementsByUUID[stationId]?.name ?? browse?.name ?? stationId
-    }
-    var displayCity: String {
-        guard let b = browse else { return "" }
-        let state = b.state ?? ""
-        let country = b.country ?? ""
-        if state.isEmpty && country.isEmpty { return "" }
-        if state.isEmpty { return country }
-        if country.isEmpty { return state }
-        return "\(state), \(country)"
-    }
-    var faviconUrl: String? {
-        guard let b = browse, !(b.favicon ?? "").isEmpty else { return nil }
-        return b.favicon
-    }
-    var logoAsset: String? {
-        CuratedStationsLoader.enhancementsByUUID[stationId]?.logoAsset
-    }
-
-    func toRadioStation() -> RadioStation {
-        if let b = browse { return b.toRadioStation() }
-        return RadioStation(stationId: stationId, name: stationId, streamUrl: "")
-    }
-}
-
 class FavoritesViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
-    private var rows: [FavoriteRow] = []
+    private var rows: [CachedFavoriteStation] = []
     private var loadTask: Task<Void, Never>?
-
-    /// radio-browser metadata cached across reloads, keyed by station id.
-    /// Persisted to UserDefaults so cold starts show cached names/art immediately
-    /// while the network re-fetch runs in the background.
-    private static var browseCache: [String: RadioBrowserStation] = {
-        guard let data = UserDefaults.standard.data(forKey: "pocketradio.favoritesBrowseCache"),
-              let decoded = try? JSONDecoder().decode([String: RadioBrowserStation].self, from: data) else {
-            return [:]
-        }
-        return decoded
-    }()
-
-    private static func persistBrowseCache() {
-        guard let data = try? JSONEncoder().encode(browseCache) else { return }
-        UserDefaults.standard.set(data, forKey: "pocketradio.favoritesBrowseCache")
-    }
 
     init() {
         super.init(nibName: nil, bundle: nil)
@@ -113,47 +67,26 @@ class FavoritesViewController: UIViewController {
             return
         }
         tableView.backgroundView = nil
+
+        // Cold-start-safe: render the last resolved snapshot immediately,
+        // then refresh from Supabase + radio-browser in the background.
+        let cached = RadioFavoritesCache.shared.snapshot()
+        if !cached.isEmpty {
+            rows = cached
+            tableView.reloadData()
+        }
+
         loadTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                let favorites = try await RadioFavoritesManager.shared.loadFavorites()
-                // Load saved lyric offsets in parallel (best-effort, no UI blocker).
-                async let offsetsTask = RadioFavoritesManager.shared.fetchLyricOffsets()
-                var resolved = favorites.map { fav in
-                    FavoriteRow(stationId: fav.station_id, browse: Self.browseCache[fav.station_id])
-                }
+            // Load saved lyric offsets in parallel (best-effort, no UI blocker).
+            async let offsetsTask = RadioFavoritesManager.shared.fetchLyricOffsets()
+            let resolved = await RadioFavoritesService.shared.resolvedFavorites()
+            _ = await offsetsTask
 
-                await MainActor.run {
-                    self.rows = resolved
-                    self.tableView.reloadData()
-                    if resolved.isEmpty { self.showEmptyState() }
-                }
-                _ = await offsetsTask
-
-                // Fetch radio-browser.info metadata for all favorited stations (all are radio-browser UUIDs).
-                await withTaskGroup(of: (Int, RadioBrowserStation?).self) { group in
-                    for i in resolved.indices {
-                        let stationId = resolved[i].stationId
-                        group.addTask {
-                            let station = try? await RadioBrowserAPI.station(uuid: stationId)
-                            return (i, station)
-                        }
-                    }
-                    for await (i, station) in group {
-                        if let station {
-                            resolved[i].browse = station
-                            Self.browseCache[station.stationuuid] = station
-                        }
-                    }
-                    Self.persistBrowseCache()
-                }
-
-                await MainActor.run {
-                    self.rows = resolved
-                    self.tableView.reloadData()
-                }
-            } catch {
-                await MainActor.run { self.showEmptyState() }
+            await MainActor.run {
+                self.rows = resolved
+                self.tableView.reloadData()
+                if resolved.isEmpty { self.showEmptyState() }
             }
         }
     }
@@ -190,9 +123,9 @@ extension FavoritesViewController: UITableViewDataSource {
         let cell = tableView.dequeueReusableCell(withIdentifier: RadioStationCell.reuseId, for: indexPath) as! RadioStationCell
         let row = rows[indexPath.row]
         if let asset = row.logoAsset {
-            cell.configure(name: row.displayName, city: row.displayCity, logoAsset: asset)
+            cell.configure(name: row.name, city: row.city ?? "", logoAsset: asset)
         } else {
-            cell.configure(name: row.displayName, city: row.displayCity, faviconUrl: row.faviconUrl)
+            cell.configure(name: row.name, city: row.city ?? "", faviconUrl: row.faviconUrl)
         }
         return cell
     }
