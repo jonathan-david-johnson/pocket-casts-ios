@@ -115,10 +115,40 @@ final class RadioFavoritesService {
         // post would make those two chase each other forever.
         let changed = rows != cache.snapshot()
         cache.write(rows)
-        if changed {
+
+        if CarPlaySceneDelegate.isConnected {
+            let fetchedNew = await Self.prefetchFavicons(for: rows)
+            if changed || fetchedNew {
+                NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
+            }
+        } else if changed {
             NotificationCenter.default.post(name: .radioFavoritesChanged, object: nil)
         }
+
         return rows
+    }
+
+    /// Warms `CarPlayImageHelper.imageCache` with favicons so the Radio tab's
+    /// synchronous row adapter finds real art already cached. Only called while
+    /// a car is connected — no point warming a CarPlay-sized cache otherwise.
+    /// Returns whether any favicon was actually downloaded (vs. already warm).
+    private static func prefetchFavicons(for rows: [CachedFavoriteStation]) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            for row in rows {
+                group.addTask {
+                    await withCheckedContinuation { continuation in
+                        CarPlayImageHelper.prefetchStationImage(stationId: row.stationId, logoAsset: row.logoAsset, faviconUrl: row.faviconUrl) { fetchedNew in
+                            continuation.resume(returning: fetchedNew)
+                        }
+                    }
+                }
+            }
+            var fetchedAny = false
+            for await fetchedNew in group where fetchedNew {
+                fetchedAny = true
+            }
+            return fetchedAny
+        }
     }
 
     /// Mirrors `FavoriteRow.displayCity` exactly — state/country joining,

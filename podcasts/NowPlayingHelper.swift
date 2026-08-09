@@ -1,4 +1,5 @@
 import Foundation
+import Kingfisher
 import MediaPlayer
 import PocketCastsDataModel
 import PocketCastsUtils
@@ -61,12 +62,7 @@ class NowPlayingHelper {
             carryOverRadioTrackInfo(into: &nowPlayingInfoWithProgress, station: radio)
             applyLiveStreamMarkers(to: &nowPlayingInfoWithProgress)
 
-            let stationLogo = stationLogoImage(for: radio)
-            let imageToUse = stationLogo ?? UIImage(named: "noartwork-page")!
-            let artwork = MPMediaItemArtwork(boundsSize: CGSize(width: size, height: size), requestHandler: { _ -> UIImage in
-                imageToUse
-            })
-            nowPlayingInfoWithProgress[MPMediaItemPropertyArtwork] = artwork
+            setRadioArtwork(for: radio, size: size, into: &nowPlayingInfoWithProgress)
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoWithProgress
             return
         }
@@ -93,6 +89,45 @@ class NowPlayingHelper {
             return image
         }
         return nil
+    }
+
+    /// Baseline live-radio artwork: bundle logo > favorite's favicon > placeholder.
+    /// Writes synchronously, then swaps in the fetched favicon asynchronously if
+    /// `.remote` — mirrors the guard pattern in
+    /// `PlaybackManager.resolveRadioArtworkForLockScreen`.
+    private class func setRadioArtwork(for station: RadioStation, size: Int, into info: inout [String: AnyObject]) {
+        let faviconUrl = RadioFavoritesCache.shared.snapshot().first { $0.stationId == station.stationId }?.faviconUrl
+        let source = RadioArtworkSource.resolve(logoAsset: station.logoAsset, faviconUrl: faviconUrl)
+
+        let placeholderImage: UIImage
+        switch source {
+        case .bundleAsset(let asset):
+            placeholderImage = UIImage(named: asset) ?? UIImage(named: "noartwork-page")!
+        case .remote, .placeholder:
+            placeholderImage = UIImage(named: "noartwork-page")!
+        }
+
+        info[MPMediaItemPropertyArtwork] = artwork(for: placeholderImage, size: size)
+
+        if case .remote(let url) = source {
+            let stationId = station.stationId
+            let artCache = ImageManager.sharedManager.radioAlbumArtCache
+            KingfisherManager.shared.retrieveImage(with: url, options: [.targetCache(artCache)]) { result in
+                guard let image = try? result.get().image else { return }
+                DispatchQueue.main.async {
+                    // Bail if the station has since changed — a fast switch must
+                    // never paint a stale favicon onto the new station.
+                    guard PlaybackManager.shared.currentEpisode()?.uuid == stationId else { return }
+                    setArtworkImage(image)
+                }
+            }
+        }
+    }
+
+    private class func artwork(for image: UIImage, size: Int) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: CGSize(width: size, height: size), requestHandler: { _ -> UIImage in
+            image
+        })
     }
 
     /// Replace `MPMediaItemPropertyArtwork` for the current `nowPlayingInfo`

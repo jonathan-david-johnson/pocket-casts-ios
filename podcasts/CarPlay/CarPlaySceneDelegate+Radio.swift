@@ -6,18 +6,19 @@ import PocketCastsUtils
 /// Pure routing decision, extracted so it can be tested without reaching through
 /// a `CPListItem`'s write-only `handler`.
 enum RadioCarPlayRouting {
-    /// Curated rows carry no stream URL — `CuratedStation` only knows its
-    /// `defaultSeedUUID`, which has to be resolved through the registry or
-    /// radio-browser before playback. Favorites arrive from the cache already
-    /// resolved and can start synchronously.
+    /// A favorite normally arrives from the cache with its stream URL already
+    /// resolved. It can be empty when `RadioFavoritesService` kept the row for
+    /// its curated enhancement (name/logo) despite radio-browser metadata
+    /// failing to resolve — that row still only knows a station UUID and needs
+    /// `RadioPlaybackStarter.play(stationId:source:)` to look it up.
     static func needsResolution(streamUrl: String) -> Bool {
         streamUrl.isEmpty
     }
 }
 
 extension RadioCarPlayRow {
-    /// Only valid when `streamUrl` is non-empty (favorites). Curated rows must
-    /// go through `RadioPlaybackStarter.play(stationId:source:)` instead.
+    /// Only valid when `streamUrl` is non-empty. A row with an empty stream URL
+    /// must go through `RadioPlaybackStarter.play(stationId:source:)` instead.
     func toRadioStation() -> RadioStation {
         RadioStation(
             stationId: stationId,
@@ -44,7 +45,6 @@ extension CarPlaySceneDelegate {
 
         let model = RadioCarPlayRowBuilder.sections(
             favorites: RadioFavoritesCache.shared.snapshot(),
-            curated: CuratedStationsLoader.load(),
             isSignedIn: ServerSettings.userId != nil,
             nowPlayingStationId: PlaybackManager.shared.liveStation(for: nil)?.uuid,
             maxRowsPerSection: Constants.Limits.maxCarplayItems
@@ -63,7 +63,7 @@ extension CarPlaySceneDelegate {
 
     func convertToListSection(_ section: RadioCarPlaySection) -> CPListSection {
         let items = section.rows.map { row -> CPListItem in
-            let image = row.logoAsset.flatMap { UIImage(named: $0) } ?? UIImage(systemName: Self.radioSymbolName)
+            let image = CarPlayImageHelper.imageForStation(stationId: row.stationId, logoAsset: row.logoAsset, faviconUrl: row.faviconUrl)
             let item = CPListItem(text: row.title, detailText: row.detail, image: image)
 
             // Deliberately no `playbackProgress` (a live stream has none, and
