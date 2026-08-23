@@ -9,6 +9,18 @@ struct CachedFavoriteStation: Codable, Equatable {
     let logoAsset: String?
     let faviconUrl: String?
     let bitrate: Int?
+    let tracklistUrl: String?
+
+    init(stationId: String, name: String, streamUrl: String, city: String?, logoAsset: String?, faviconUrl: String?, bitrate: Int?, tracklistUrl: String? = nil) {
+        self.stationId = stationId
+        self.name = name
+        self.streamUrl = streamUrl
+        self.city = city
+        self.logoAsset = logoAsset
+        self.faviconUrl = faviconUrl
+        self.bitrate = bitrate
+        self.tracklistUrl = tracklistUrl
+    }
 
     func toRadioStation() -> RadioStation {
         RadioStation(
@@ -17,6 +29,7 @@ struct CachedFavoriteStation: Codable, Equatable {
             streamUrl: streamUrl,
             city: city,
             bitrate: bitrate,
+            tracklistUrl: tracklistUrl,
             logoAsset: logoAsset
         )
     }

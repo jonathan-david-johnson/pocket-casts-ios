@@ -106,7 +106,8 @@ final class RadioFavoritesService {
                 city: Self.displayCity(for: b),
                 logoAsset: enhancement?.logoAsset,
                 faviconUrl: (b?.favicon?.isEmpty == false) ? b?.favicon : nil,
-                bitrate: b?.bitrate
+                bitrate: b?.bitrate,
+                tracklistUrl: enhancement?.tracklistUrl
             ))
         }
 

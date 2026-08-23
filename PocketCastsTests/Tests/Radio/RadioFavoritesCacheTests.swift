@@ -31,10 +31,34 @@ final class RadioFavoritesCacheTests: XCTestCase {
             city: "CA, United States",
             logoAsset: "kcrw_logo",
             faviconUrl: "https://example/favicon.png",
-            bitrate: 128
+            bitrate: 128,
+            tracklistUrl: "https://kcrw.com/tracklist.json"
         )
         cache.write([row])
         XCTAssertEqual(cache.snapshot(), [row])
+    }
+
+    func testOldCachedDataWithoutTracklistUrlDecodesAsNil() {
+        // Simulates data written before tracklistUrl existed on this struct.
+        let legacyJSON = """
+        [{"stationId":"abc","name":"KCRW","streamUrl":"https://x","city":null,"logoAsset":null,"faviconUrl":null,"bitrate":null}]
+        """
+        defaults.set(Data(legacyJSON.utf8), forKey: "pocketradio.favoritesCache.v1")
+        XCTAssertNil(cache.snapshot().first?.tracklistUrl)
+    }
+
+    func testToRadioStationPassesThroughTracklistUrl() {
+        let row = CachedFavoriteStation(
+            stationId: "abc",
+            name: "KCRW",
+            streamUrl: "https://stream.example/kcrw",
+            city: nil,
+            logoAsset: nil,
+            faviconUrl: nil,
+            bitrate: nil,
+            tracklistUrl: "https://kcrw.com/tracklist.json"
+        )
+        XCTAssertEqual(row.toRadioStation().tracklistUrl, "https://kcrw.com/tracklist.json")
     }
 
     func testOrderIsPreserved() {
